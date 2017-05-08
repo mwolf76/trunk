@@ -153,7 +153,8 @@ public class RequestHandler implements Handler<HttpServerRequest> {
         }
         if (authProvider == null) {
             throw new RuntimeException(
-                    MessageFormat.format("Unsupported OAuth2 provider: {}", oauth2ProviderName));
+                    MessageFormat.format("Unsupported OAuth2 provider: {0}",
+                            oauth2ProviderName));
         }
 
         // create a oauth2 handler on our domain

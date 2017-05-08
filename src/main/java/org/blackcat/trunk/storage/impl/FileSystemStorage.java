@@ -65,7 +65,7 @@ public class FileSystemStorage implements Storage {
                         handler.handle(null); /* all good */
                     } else {
                         throw new FileSystemException(MessageFormat.format(
-                                "Path {} already exists and it's not a directory.",
+                                "Path {0} already exists and it's not a directory.",
                                 userDirectoryPath
                         ));
                     }
@@ -76,7 +76,7 @@ public class FileSystemStorage implements Storage {
                         handler.handle(null); /* all good */
                     else {
                         throw new FileSystemException(MessageFormat.format(
-                                "Could not mkdir path {} for user {}.",
+                                "Could not make directory {0} for user {1}.",
                                 userDirectoryPath, userMapper.getEmail()));
                     }
                 });

@@ -102,7 +102,7 @@ final public class Configuration {
         this.dbType = databaseSection.getString(DATABASE_TYPE);
         if (! dbType.equals(DATABASE_TYPE_MONGODB)) {
             throw new ConfigurationException( MessageFormat.format(
-                    "Unsupported oauth2 provider: {}", oauth2Provider));
+                    "Unsupported oauth2 provider: {0}", oauth2Provider));
         }
         this.dbHost = databaseSection.getString(DATABASE_HOST, DEFAULT_DATABASE_HOST);
         this.dbPort = databaseSection.getInteger(DATABASE_PORT, DEFAULT_DATABASE_PORT);
@@ -116,7 +116,7 @@ final public class Configuration {
         // TODO: add more supported providers
         if (! oauth2Provider.equals(OAUTH2_PROVIDER_GOOGLE)) {
             throw new ConfigurationException( MessageFormat.format(
-                    "Unsupported oauth2 provider: {}", oauth2Provider));
+                    "Unsupported oauth2 provider: {0}", oauth2Provider));
         }
         this.oauth2ClientID = oauth2Section.getString(OAUTH2_CLIENT_ID);
         this.oauth2ClientSecret = oauth2Section.getString(OAUTH2_CLIENT_SECRET);
