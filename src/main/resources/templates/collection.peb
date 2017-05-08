@@ -33,16 +33,12 @@
     <a id="plus-button" href="#add-resource-modal" class="btn btn-primary" data-toggle="modal"><span
             class="glyphicon glyphicon-plus" aria-hidden="true"></span></a>
     {% else %}
-    <!--<div id="guest-topright">-->
-        <!--<span id="owner-span">Owned by<br><strong>{{ context.get("ownerEmail") }}</strong></span>-->
-        <!--<a href="#"><span class="glyphicon glyphicon-globe icon-topright"></span></a>-->
-    <!--</div>-->
     {% endif %}
     {% if not context.get("isEmpty") %}
     <a id="download-button" href="?tarball=t" class="btn btn-primary"><span
             class="glyphicon glyphicon-cloud-download" aria-hidden="true"></span></a>
     {%endif %}
-    {% if context.get("isEmpty") and context.get("isOwner") %}
+    {% if context.get("isEmpty") and context.get("isOwner") and not context.get("isToplevel") %}
     <a id="minus-button" href="#delete-resource-modal" class="btn btn-warning" data-toggle="modal"><span
             class="glyphicon glyphicon-minus" aria-hidden="true"></span></a>
     {% endif %}
