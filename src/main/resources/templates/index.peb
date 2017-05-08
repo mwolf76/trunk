@@ -1,0 +1,38 @@
+{% extends "base.peb" %}
+{% block title %}Trunk - your personal repository{% endblock %}
+
+{% block pagestyle %}
+<style src="text/css">
+  body {
+    text-align: center;
+  }
+
+  .wraptocenter {
+  text-align: center;
+  vertical-align: middle;
+  width: 50%;
+  margin: 4em auto;
+}
+.wraptocenter * {
+  vertical-align: middle;
+  width: 100%;
+  max-width: 500px;
+}
+</style>
+{% endblock %}
+
+{% block pagejs %}
+{% endblock %}
+
+{% block content %}
+<h1>Trunk</h1>
+<h4>Your personal repository</h4>
+<div class="wraptocenter">
+    <img src="/static/img/trunk.png">
+</div>
+<br/>
+<a href="protected/main">Open up!</a>
+<p>
+    <br/>
+    <br/>
+{% endblock %}
