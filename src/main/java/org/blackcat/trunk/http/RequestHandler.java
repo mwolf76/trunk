@@ -494,7 +494,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                     if (isOwner) {
                         ctx
                                 .put("authorizedUsers", shareMapper == null
-                                        ? "" : String.join(" ", shareMapper.getAuthorizedUsers()));
+                                        ? "" : String.join("; ", shareMapper.getAuthorizedUsers()));
                     }
                     else {
                         ctx

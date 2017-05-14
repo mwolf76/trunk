@@ -47,10 +47,11 @@ function setup_share_resource_modal() {
     $('#commit-shared-collection-resource')
         .on('click', function (event) {
             var collectionPath = $('#share-collection-resource-path').val();
-            var authorizedEmails = $('#share-collection-resource-input').val().split(' ');
+            var authorizedEmails = $('#share-collection-resource-input').val().split(';').map(function (s) {
+                return ( s || '' ).replace( /^\s+|\s+$/g, '' );
+            });
 
             putShare(collectionPath, authorizedEmails, function() {
-                console.log("Thomas");
                 window.location.reload(true);
             });
         });
