@@ -361,7 +361,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                         getResourceAux(ctx, false, shareMapper);
                     }
                     else {
-                        logger.info("Not the owner, nor sharing permission exists: Access denied.");
+                        logger.warn("Not the owner, nor sharing permission exists: Access denied.");
                         forbidden(ctx);
                     }
                 });
@@ -381,7 +381,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
 
 
         Path resolvedPath = storage.getRoot().resolve(protectedPath);
-        logger.info("GET {} -> {} [etag: {}]",
+        logger.trace("GET {} -> {} [etag: {}]",
                 protectedPath.toString(), resolvedPath.toString(), etag);
 
         storage.get(resolvedPath, etag, resource -> {
@@ -771,7 +771,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                         } else {
                             UserMapper userMapper = nextAsyncResult.result();
 
-                            logger.info("Found matching user for {}: {}", email, userMapper);
+                            logger.trace("Found matching user for {}: {}", email, userMapper);
                             handler.handle(userMapper);
                         }
                     });
@@ -795,7 +795,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                             IWriteResult writeResult = result.result();
                             IWriteEntry entry = writeResult.iterator().next();
 
-                            logger.info( "Created new userMapper for {}: {}", email, entry.getStoreObject());
+                            logger.trace( "Created new userMapper for {}: {}", email, entry.getStoreObject());
 
                             /* verify if home directory for this user exists, create it if not. */
                             storage.checkUserDirectory(userMapper, event -> {
@@ -843,7 +843,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                 } else {
                     IWriteResult shareWriteResult = shareWriteAsyncResult.result();
                     IWriteEntry shareWriteEntry = shareWriteResult.iterator().next();
-                    logger.info("{} {}",
+                    logger.trace("{} {}",
                             shareWriteEntry.getAction(),
                             shareWriteEntry.getStoreObject());
                     handler.handle(null); /* done */
@@ -883,13 +883,13 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                             ShareMapper shareMapper = shareNextAsyncResult.result();
 
                             /* found share record */
-                            logger.info("Found sharing info {} for {}", shareMapper, collectionPath);
+                            logger.trace("Found sharing info {} for {}", shareMapper, collectionPath);
                             handler.handle(shareMapper);
                         }
                     });
                 }
                 else {
-                    logger.info("No sharing info found for {}", collectionPath);
+                    logger.trace("No sharing info found for {}", collectionPath);
                     handler.handle(null);
                 }
             }
