@@ -85,29 +85,10 @@ public class FileSystemStorage implements Storage {
     }
 
     @Override
-    public List<Path> collectDirectory(Path start) {
-
-        List<Path> res = null;
-
+    public FileProps pathProperties(Path path) throws IOException {
         /* local ref to the filesystem object */
         FileSystem fileSystem = vertx.fileSystem();
-
-        try (Stream<Path> walk = Files.walk(start)) {
-            res = walk
-                    .filter(new Predicate<Path>() {
-                        @Override
-                        public boolean test(Path path) {
-                            final FileProps fileProps = fileSystem.propsBlocking(path.toString());
-                            return fileProps.isRegularFile();
-                        }
-                    })
-                    .collect(Collectors.toList());
-        }
-        catch (IOException ioe) {
-            throw new RuntimeException(ioe);
-        }
-
-        return res;
+        return fileSystem.propsBlocking(path.toString());
     }
 
     @Override

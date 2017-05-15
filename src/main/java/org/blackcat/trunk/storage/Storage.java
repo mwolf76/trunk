@@ -1,12 +1,12 @@
 package org.blackcat.trunk.storage;
 
 import io.vertx.core.Handler;
+import io.vertx.core.file.FileProps;
 import org.blackcat.trunk.mappers.UserMapper;
 import org.blackcat.trunk.resource.Resource;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.stream.Stream;
 
 public interface Storage {
@@ -22,6 +22,7 @@ public interface Storage {
     void checkUserDirectory(UserMapper userMapper, Handler<Void> done);
 
     /**
+     * Stream interface to the file walker in the storage
      *
      * @param start
      * @return
@@ -30,11 +31,13 @@ public interface Storage {
     public Stream<Path> streamDirectory(Path start) throws IOException;
 
     /**
-     * Walks given directory, invoking action on each entry. Invokes done on completion.
+     * Retrieves properties for path on the storage (blocking)
      *
      * @param path
+     * @return
+     * @throws IOException
      */
-    List<Path> collectDirectory(Path path);
+    FileProps pathProperties(Path path) throws IOException;
 
     /**
      * Deletes a resource from the storage

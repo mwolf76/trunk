@@ -1,5 +1,6 @@
 package org.blackcat.trunk.util;
 
+import io.vertx.core.file.FileProps;
 import org.blackcat.trunk.storage.Storage;
 import org.kamranzafar.jtar.TarEntry;
 import org.kamranzafar.jtar.TarOutputStream;
@@ -9,6 +10,9 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class TarballInputStream extends InputStream {
 
@@ -35,7 +39,25 @@ public class TarballInputStream extends InputStream {
 
         new Thread(() -> {
 
-            List<Path> entries = storage.collectDirectory(storage.getRoot().resolve(collectionPath));
+            List <Path> entries = null;
+            try (Stream<Path> pathStream = storage.streamDirectory(storage.getRoot().resolve(collectionPath))) {
+                entries = pathStream
+                        .filter(new Predicate<Path>() {
+                            @Override
+                            public boolean test(Path path) {
+                                try {
+                                    final FileProps fileProps = storage.pathProperties(path);
+                                    return fileProps.isRegularFile();
+                                }
+                                catch (IOException ioe) {
+                                    return false;
+                                }
+                            }
+                        })
+                        .collect(Collectors.toList());
+            } catch (IOException ioe) {
+                throw new RuntimeException("Can't collect filenames for archive.");
+            }
             logger.info("collected {} entries", entries.size());
 
             try {
