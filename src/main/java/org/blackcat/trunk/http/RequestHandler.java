@@ -322,45 +322,51 @@ public class RequestHandler implements Handler<HttpServerRequest> {
         JsonObject idToken = KeycloakHelper.idToken(at.principal());
         String email = idToken.getString("email");
 
-        List <Path> paths = null;
-        try (Stream<Path> pathStream = storage.streamDirectory(storage.getRoot().resolve(collectionPath))) {
-            paths = pathStream.collect(Collectors.toList());
-        } catch (IOException ioe) {
-            ioe.printStackTrace();
-        }
-        if (paths == null) {
-            internalServerError(ctx);
-            return;
-        }
+        findCreateUserEntityByEmail(email, userMapper -> {
 
-        /* first link of the chain */
-        Future<Void> initFuture = Future.future(event -> {
-            logger.info("Started updating share permissions...");
-        });
-        Future<Void> prevFuture = initFuture;
-        for (Path path : paths) {
-            Future chainFuture = Future.future();
-            prevFuture.compose(v -> {
-                findCreateUserEntityByEmail(email, userMapper -> {
+            // TODO: this may block for a long time
+            List <Path> paths = null;
+            try (Stream<Path> pathStream = storage.streamDirectory(storage.getRoot().resolve(collectionPath))) {
+                paths = pathStream.collect(Collectors.toList());
+            } catch (IOException ioe) {
+                ioe.printStackTrace();
+            }
+            if (paths == null) {
+                internalServerError(ctx);
+                return;
+            }
+
+            final long pathsCount = paths.size();
+
+            /* first link of the chain */
+            Future<Void> initFuture = Future.future(event -> {
+                logger.info("Started updating share permissions, owner is {}.", userMapper.getEmail());
+            });
+            Future<Void> prevFuture = initFuture;
+
+            for (Path path : paths) {
+                Future chainFuture = Future.future();
+                prevFuture.compose(v -> {
                     if (userMapper != null && collectionPath.startsWith(Paths.get(userMapper.getUuid()))) {
                         findUpdateShareEntity(userMapper, storage.getRoot().relativize(path), newAuthorizedUsers, done -> {
-                            logger.info("Updated {}", path);
+                            logger.info(path.toString());
                             chainFuture.complete();
                         });
                     } else {
-                        chainFuture.fail("No bloody way");
+                        chainFuture.fail("No bloody way!");
                     }
-                });
-            }, chainFuture);
-            prevFuture = chainFuture;
-        }
-        prevFuture.compose(v -> {
-            logger.info("Done updating share permissions...");
-            done(ctx);
-        }, initFuture);
+                }, chainFuture);
+
+                prevFuture = chainFuture;
+            }
+            prevFuture.compose(v -> {
+                logger.info("Done updating share permissions ({} entries processed).", pathsCount);
+                done(ctx);
+            }, initFuture);
 
         /* let's get this thing started ... */
-        initFuture.complete();
+            initFuture.complete();
+        });
     } /* putSharingInfo() */
 
     private void getResource(RoutingContext ctx) {
