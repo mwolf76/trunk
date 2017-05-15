@@ -46,8 +46,7 @@ public class TarballInputStream extends InputStream {
                             @Override
                             public boolean test(Path path) {
                                 try {
-                                    final FileProps fileProps = storage.pathProperties(path);
-                                    return fileProps.isRegularFile();
+                                    return storage.pathProperties(path).isRegularFile();
                                 }
                                 catch (IOException ioe) {
                                     return false;
