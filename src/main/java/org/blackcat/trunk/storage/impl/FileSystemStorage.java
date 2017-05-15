@@ -111,17 +111,8 @@ public class FileSystemStorage implements Storage {
     }
 
     @Override
-    public void walkDirectory(Path start, Handler<Path> action, Handler<Void> done) {
-        try (Stream<Path> walk = Files.walk(start)) {
-            walk.forEach(new Consumer<Path>() {
-                @Override
-                public void accept(Path path) {
-                        action.handle(path);
-                }
-            });
-        } catch (IOException ioe) {
-            throw new RuntimeException(ioe);
-        }
+    public Stream<Path> streamDirectory(Path start) throws IOException {
+        return Files.walk(start);
     }
 
     @Override

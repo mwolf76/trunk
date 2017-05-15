@@ -4,8 +4,10 @@ import io.vertx.core.Handler;
 import org.blackcat.trunk.mappers.UserMapper;
 import org.blackcat.trunk.resource.Resource;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Stream;
 
 public interface Storage {
 
@@ -20,13 +22,12 @@ public interface Storage {
     void checkUserDirectory(UserMapper userMapper, Handler<Void> done);
 
     /**
-     * Walks given directory, invoking action on each entry. Invokes done on completion.
      *
-     * @param path
-     * @param action
-     * @param done
+     * @param start
+     * @return
+     * @throws IOException
      */
-    void walkDirectory(Path path, Handler<Path> action, Handler<Void> done);
+    public Stream<Path> streamDirectory(Path start) throws IOException;
 
     /**
      * Walks given directory, invoking action on each entry. Invokes done on completion.

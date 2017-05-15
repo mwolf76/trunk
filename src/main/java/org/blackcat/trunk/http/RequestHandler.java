@@ -7,6 +7,7 @@ import de.braintags.io.vertx.pojomapper.dataaccess.query.IQueryResult;
 import de.braintags.io.vertx.pojomapper.dataaccess.write.IWrite;
 import de.braintags.io.vertx.pojomapper.dataaccess.write.IWriteEntry;
 import de.braintags.io.vertx.pojomapper.dataaccess.write.IWriteResult;
+import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.MultiMap;
 import io.vertx.core.Vertx;
@@ -36,8 +37,8 @@ import org.blackcat.trunk.resource.impl.DocumentContentResource;
 import org.blackcat.trunk.resource.impl.DocumentDescriptorResource;
 import org.blackcat.trunk.resource.impl.ErrorResource;
 import org.blackcat.trunk.storage.Storage;
-import org.blackcat.trunk.util.TarballInputStream;
 import org.blackcat.trunk.util.AsyncInputStream;
+import org.blackcat.trunk.util.TarballInputStream;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
@@ -48,6 +49,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.blackcat.trunk.util.Utils.*;
 
@@ -319,22 +322,45 @@ public class RequestHandler implements Handler<HttpServerRequest> {
         JsonObject idToken = KeycloakHelper.idToken(at.principal());
         String email = idToken.getString("email");
 
-        storage.walkDirectory(storage.getRoot().resolve(collectionPath), entry -> {
-            findCreateUserEntityByEmail(email, userMapper -> {
-                if (userMapper != null && collectionPath.startsWith(Paths.get(userMapper.getUuid()))) {
-                    findUpdateShareEntity(userMapper, storage.getRoot().relativize(entry), newAuthorizedUsers, done -> {
-                        // done(ctx);
-                    });
-                } else {
-                    // forbidden(ctx);
-                }
-            });
-        }, done -> {
-            done(ctx);
-            // System.err.println("Done!");
+        List <Path> paths = null;
+        try (Stream<Path> pathStream = storage.streamDirectory(storage.getRoot().resolve(collectionPath))) {
+            paths = pathStream.collect(Collectors.toList());
+        } catch (IOException ioe) {
+            ioe.printStackTrace();
+        }
+        if (paths == null) {
+            internalServerError(ctx);
+            return;
+        }
+
+        /* first link of the chain */
+        Future<Void> initFuture = Future.future(event -> {
+            logger.info("Started updating share permissions...");
         });
+        Future<Void> prevFuture = initFuture;
+        for (Path path : paths) {
+            Future chainFuture = Future.future();
+            prevFuture.compose(v -> {
+                findCreateUserEntityByEmail(email, userMapper -> {
+                    if (userMapper != null && collectionPath.startsWith(Paths.get(userMapper.getUuid()))) {
+                        findUpdateShareEntity(userMapper, storage.getRoot().relativize(path), newAuthorizedUsers, done -> {
+                            logger.info("Updated {}", path);
+                            chainFuture.complete();
+                        });
+                    } else {
+                        chainFuture.fail("No bloody way");
+                    }
+                });
+            }, chainFuture);
+            prevFuture = chainFuture;
+        }
+        prevFuture.compose(v -> {
+            logger.info("Done updating share permissions...");
+            done(ctx);
+        }, initFuture);
 
-
+        /* let's get this thing started ... */
+        initFuture.complete();
     } /* putSharingInfo() */
 
     private void getResource(RoutingContext ctx) {
