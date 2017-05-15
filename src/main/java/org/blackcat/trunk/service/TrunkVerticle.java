@@ -2,6 +2,7 @@ package org.blackcat.trunk.service;
 
 /**
  * TrunkVerticle - provides a REST interface to a disk storage.
+ *
  * @author (c) 2017 marco DOT pensallorto AT gmail DOT com
  */
 
@@ -32,60 +33,65 @@ public class TrunkVerticle extends AbstractVerticle {
     public void start(Future<Void> startFuture) {
 
         logger = LoggerFactory.getLogger(TrunkVerticle.class);
+        vertx.executeBlocking(future -> {
 
-        /* retrieve configuration object from vert.x ctx */
-        final Configuration configuration = new Configuration(vertx.getOrCreateContext().config());
-        logger.info("Configuration: {}", configuration.toString());
+            /* retrieve configuration object from vert.x ctx */
+            final Configuration configuration = new Configuration(vertx.getOrCreateContext().config());
+            logger.info("Configuration: {}", configuration.toString());
 
         /* configure Pebble template engine */
-        final PebbleTemplateEngine pebbleEngine = PebbleTemplateEngine.create(vertx);
+            final PebbleTemplateEngine pebbleEngine = PebbleTemplateEngine.create(vertx);
 
         /* connect to mongo data store */
-        String connectionString = String.format("%s://%s:%s",
-                configuration.getDatabaseType(),
-                configuration.getDatabaseHost(),
-                configuration.getDatabasePort());
-        logger.info("DB connection string: {}, name: {}", connectionString);
+            String connectionString = String.format("%s://%s:%s",
+                    configuration.getDatabaseType(),
+                    configuration.getDatabaseHost(),
+                    configuration.getDatabasePort());
+            logger.info("DB connection string: {}, name: {}", connectionString);
 
-        JsonObject mongoConfig = new JsonObject()
-                .put("connection_string", connectionString)
-                .put("db_name", configuration.getDatabaseName());
+            JsonObject mongoConfig = new JsonObject()
+                    .put("connection_string", connectionString)
+                    .put("db_name", configuration.getDatabaseName());
 
-        MongoClient mongoClient = MongoClient.createNonShared(vertx, mongoConfig);
-        MongoDataStore mongoDataStore = new MongoDataStore(vertx, mongoClient, mongoConfig);
+            MongoClient mongoClient = MongoClient.createNonShared(vertx, mongoConfig);
+            MongoDataStore mongoDataStore = new MongoDataStore(vertx, mongoClient, mongoConfig);
 
-        Storage storage = new FileSystemStorage(vertx, logger,
-                Paths.get(configuration.getStorageRoot()));
+            Storage storage = new FileSystemStorage(vertx, logger,
+                    Paths.get(configuration.getStorageRoot()));
 
         /* configure request handler */
-        Handler<HttpServerRequest> handler =
-                new RequestHandler(vertx, pebbleEngine, logger, configuration, mongoDataStore, storage);
+            Handler<HttpServerRequest> handler =
+                    new RequestHandler(vertx, pebbleEngine, logger, configuration, mongoDataStore, storage);
 
-        HttpServerOptions httpServerOptions = new HttpServerOptions()
-                // in Vert.x 2x 100-continues was activated per default, in vert.x 3x it is off per default.
-                .setHandle100ContinueAutomatically(true);
+            HttpServerOptions httpServerOptions = new HttpServerOptions()
+                    // in Vert.x 2x 100-continues was activated per default, in vert.x 3x it is off per default.
+                    .setHandle100ContinueAutomatically(true);
 
-        if (configuration.sslEnabled()) {
+            if (configuration.sslEnabled()) {
                 httpServerOptions
                         .setSsl(true)
                         .setKeyStoreOptions(
                                 new JksOptions()
                                         .setPath(configuration.getKeystoreFilename())
                                         .setPassword(configuration.getKeystorePassword()));
-        }
+            }
 
-        vertx.createHttpServer(httpServerOptions)
-                .requestHandler(handler)
-                .listen(configuration.getHttpPort(), result -> {
+            vertx.createHttpServer(httpServerOptions)
+                    .requestHandler(handler)
+                    .listen(configuration.getHttpPort(), result -> {
 
-                    if (result.succeeded()) {
-                        logger.info("Ready to accept requests on port {}.",
-                                String.valueOf(configuration.getHttpPort()));
+                        if (result.succeeded()) {
+                            logger.info("Ready to accept requests on port {}.",
+                                    String.valueOf(configuration.getHttpPort()));
 
-                        startFuture.complete();
-                    } else {
-                        startFuture.fail(result.cause());
-                    }
-                });
+                            startFuture.complete();
+                        } else {
+                            startFuture.fail(result.cause());
+                        }
+                    });
+
+            future.complete();
+        }, res -> {
+        });
     }
 }
