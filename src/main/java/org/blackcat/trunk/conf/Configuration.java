@@ -150,7 +150,6 @@ final public class Configuration {
                 ", oauth2Provider='" + oauth2Provider + '\'' +
                 ", oauth2ClientID='" + oauth2ClientID + '\'' +
                 ", oauth2ClientSecret='" + oauth2ClientSecret + '\'' +
-                ", oauth2Domain='" + oauth2Domain + '\'' +
                 ", storageRoot='" + storageRoot + '\'' +
                 ", sslEnabled=" + sslEnabled() +
                 ", OAuth2Domain='" + getOAuth2Domain() + '\'' +
