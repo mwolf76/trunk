@@ -3,7 +3,6 @@ package org.blackcat.trunk.resource.impl;
 import io.vertx.core.Handler;
 import io.vertx.core.streams.ReadStream;
 import io.vertx.core.streams.WriteStream;
-import org.blackcat.trunk.resource.impl.BaseResource;
 
 public final class DocumentContentResource extends BaseResource {
 
@@ -40,11 +39,6 @@ public final class DocumentContentResource extends BaseResource {
     private Handler<Void> closeHandler;
     public Handler<Void> getCloseHandler() {
         return closeHandler;
-    }
-
-    public DocumentContentResource(String name, long length) {
-        setName(name);
-        this.length = length;
     }
 
     public DocumentContentResource(String mimetype, long length, ReadStream readStream, Handler<Void> closeHandler) {

@@ -460,16 +460,21 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                         AsyncInputStream asyncInputStream = new AsyncInputStream(
                                 vertx, tarballInputStream);
 
+                        String archiveName = resolvedPath.getFileName().toString() + ".tar";
+
                         ctx.response()
                                 .putHeader(Headers.CONTENT_TYPE_HEADER, "application/x-tar")
                                 .putHeader(Headers.CONTENT_DISPOSITION, String.format(
-                                        "attachment; filename=\"%s.tar\"", resolvedPath.getFileName().toString()))
-                                .setChunked(true)
+                                        "attachment; filename=\"%s\"", archiveName))
+                                .setChunked(true) // required
                         ;
 
                         asyncInputStream.exceptionHandler( exception -> {
                             logger.error(exception.toString());
                         });
+
+                        /* setting up xfer */
+                        Pump pump = Pump.pump(asyncInputStream, ctx.response());
 
                         /* when all is done on the read stream for the resource, close the resource and then the response too. */
                         asyncInputStream
@@ -477,20 +482,19 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                                     logger.error(cause.toString());
                                 })
                                 .endHandler(event -> {
-                                    logger.info("closing streams ...");
                                     done(ctx);
                                 });
 
-                        /* init xfer */
-                        logger.trace("Initializing outgoing file xfer...");
-                        Pump
-                                .pump(asyncInputStream, ctx.response())
-                                .start();
+                        ctx
+                                .response()
+                                .closeHandler(event -> {
+                                    logger.info("interrupted by client");
+                                    tarballInputStream.setCanceled(true);
+                                });
 
-                        ctx.response().closeHandler(event -> {
-                            logger.info("response closed");
-                            tarballInputStream.setCanceled(true);
-                        });
+                        logger.info("archive file transfer started for {} ...", archiveName);
+                        pump
+                                .start();
                     }
                     catch (IOException ioe) {
                         logger.error(ioe.toString());
@@ -634,15 +638,21 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                         ctx.response()
                                 .putHeader(Headers.ETAG_HEADER, documentResourceEtag);
                     }
+
+                    /* setting up xfer */
                     ctx.response()
                             .putHeader(Headers.CONTENT_TYPE_HEADER,
                                     documentContentResource.getMimeType())
                             .putHeader(Headers.CONTENT_LENGTH_HEADER,
                                     String.valueOf(documentContentResource.getLength()));
 
+                    Pump pump = Pump.pump(documentContentResource.getReadStream(), ctx.response());
+
                     /* when all is done on the read stream for the resource, close the resource and then the response too. */
                     documentContentResource.getReadStream()
                             .endHandler(event -> {
+                                logger.info("... outgoing file transfer completed, {} bytes transferred.",
+                                        documentContentResource.getLength());
 
                                 documentContentResource.getCloseHandler()
                                         .handle(null);
@@ -650,16 +660,12 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                                 done(ctx);
                             });
 
-                    /* init xfer */
-                    logger.trace("Initializing outgoing file xfer...");
-                    Pump
-                            .pump(documentContentResource.getReadStream(), ctx.response())
-                            .start();
+                    logger.info("outgoing file transfer started ...");
+                    pump.start();
                 }
             }
         });
     }
-
 
     /* PUTs are used to create collections */
     private void putResource(RoutingContext ctx) {
@@ -690,8 +696,6 @@ public class RequestHandler implements Handler<HttpServerRequest> {
 
     /* POSTs are used to create/update documents */
     private void postResource(RoutingContext ctx) {
-
-        ctx.request().pause();
 
         final HttpServerRequest request = ctx.request();
         Path protectedPath = protectedPath(ctx);
@@ -728,18 +732,17 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                 DocumentContentResource documentContentResource =
                         (DocumentContentResource) resource;
 
+                /* setting up xfer */
+                Pump pump = Pump.pump(request, documentContentResource.getWriteStream());
+
                 request.endHandler(event -> {
+                    logger.info("... incoming file transfer completed.");
                     documentContentResource.getCloseHandler()
                             .handle(null);
                 });
 
-                /* init xfer */
-                logger.trace("Initializing incoming file xfer...");
-                Pump
-                        .pump(request, documentContentResource.getWriteStream())
-                        .start();
-
-                ctx.request().resume();
+                logger.trace("incoming file transfer started ...");
+                pump.start();
             }
         });
     }
