@@ -705,6 +705,10 @@ public class RequestHandler implements Handler<HttpServerRequest> {
     /* POSTs are used to create/update documents */
     private void postResource(RoutingContext ctx) {
 
+        ctx
+                .request()
+                .pause();
+
         final HttpServerRequest request = ctx.request();
         Path protectedPath = protectedPath(ctx);
 
@@ -754,6 +758,10 @@ public class RequestHandler implements Handler<HttpServerRequest> {
 
                 logger.trace("incoming file transfer started ...");
                 pump.start();
+
+                ctx
+                        .request()
+                        .resume();
             }
         });
     }
