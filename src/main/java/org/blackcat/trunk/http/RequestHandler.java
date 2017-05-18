@@ -37,6 +37,7 @@ import org.blackcat.trunk.resource.impl.DocumentContentResource;
 import org.blackcat.trunk.resource.impl.DocumentDescriptorResource;
 import org.blackcat.trunk.resource.impl.ErrorResource;
 import org.blackcat.trunk.storage.Storage;
+import org.blackcat.trunk.streams.impl.PumpImpl;
 import org.blackcat.trunk.util.AsyncInputStream;
 import org.blackcat.trunk.util.TarballInputStream;
 import org.jetbrains.annotations.NotNull;
@@ -482,6 +483,9 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                                     logger.error(cause.toString());
                                 })
                                 .endHandler(event -> {
+                                    logger.info("... archive file transfer completed, {} bytes transferred.",
+                                            ((PumpImpl) pump).getBytesPumped());
+
                                     done(ctx);
                                 });
 
@@ -652,7 +656,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                     documentContentResource.getReadStream()
                             .endHandler(event -> {
                                 logger.info("... outgoing file transfer completed, {} bytes transferred.",
-                                        documentContentResource.getLength());
+                                        ((PumpImpl) pump).getBytesPumped());
 
                                 documentContentResource.getCloseHandler()
                                         .handle(null);
@@ -736,7 +740,9 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                 Pump pump = Pump.pump(request, documentContentResource.getWriteStream());
 
                 request.endHandler(event -> {
-                    logger.info("... incoming file transfer completed.");
+                    logger.info("... incoming file transfer completed, {} bytes transferred.",
+                            ((PumpImpl) pump).getBytesPumped());
+
                     documentContentResource.getCloseHandler()
                             .handle(null);
                 });

@@ -1,4 +1,4 @@
-package org.blackcat.trunk.service;
+package org.blackcat.trunk.verticles;
 
 /**
  * TrunkVerticle - provides a REST interface to a disk storage.
@@ -23,6 +23,8 @@ import org.blackcat.trunk.http.RequestHandler;
 import org.blackcat.trunk.storage.Storage;
 import org.blackcat.trunk.storage.impl.FileSystemStorage;
 
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Paths;
 
 public class TrunkVerticle extends AbstractVerticle {
@@ -34,6 +36,12 @@ public class TrunkVerticle extends AbstractVerticle {
 
         logger = LoggerFactory.getLogger(TrunkVerticle.class);
         vertx.executeBlocking(future -> {
+
+            ClassLoader cl = ClassLoader.getSystemClassLoader();
+            URL[] urls = ((URLClassLoader)cl).getURLs();
+            for(URL url: urls){
+                logger.info(url.getFile());
+            }
 
             /* retrieve configuration object from vert.x ctx */
             final Configuration configuration = new Configuration(vertx.getOrCreateContext().config());
