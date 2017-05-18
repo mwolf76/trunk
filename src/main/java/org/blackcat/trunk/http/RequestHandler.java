@@ -477,20 +477,20 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                         /* setting up xfer */
                         Pump pump = Pump.pump(asyncInputStream, ctx.response());
 
-                        /* when all is done on the read stream for the resource, close the resource and then the response too. */
+                        /* when all is done on the destination stream, report stats and close the response. */
                         asyncInputStream
                                 .exceptionHandler(cause -> {
                                     logger.error(cause.toString());
-                                })
+                                });
+
+                        ctx
+                                .response()
                                 .endHandler(event -> {
                                     logger.info("... archive file transfer completed, {} bytes transferred.",
                                             ((PumpImpl) pump).getBytesPumped());
 
                                     done(ctx);
-                                });
-
-                        ctx
-                                .response()
+                                })
                                 .closeHandler(event -> {
                                     logger.info("interrupted by client");
                                     tarballInputStream.setCanceled(true);
@@ -652,7 +652,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
 
                     Pump pump = Pump.pump(documentContentResource.getReadStream(), ctx.response());
 
-                    /* when all is done on the read stream for the resource, close the resource and then the response too. */
+                    /* when all is done on the source stream, report stats and close the response. */
                     documentContentResource.getReadStream()
                             .endHandler(event -> {
                                 logger.info("... outgoing file transfer completed, {} bytes transferred.",
