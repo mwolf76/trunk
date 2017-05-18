@@ -341,6 +341,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                 /* first link of the chain */
                 Future<Void> initFuture = Future.future(event -> {
                     logger.info("Started updating share permissions, owner is {}.", userMapper.getEmail());
+                    done(ctx); /* return control to the user, process will continue in background */
                 });
                 Future<Void> prevFuture = initFuture;
 
@@ -360,7 +361,6 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                 }
                 prevFuture.compose(v -> {
                     logger.info("Done updating share permissions ({} entries processed).", paths.size());
-                    done(ctx);
                 }, initFuture);
 
                 /* let's get this thing started ... */
