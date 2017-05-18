@@ -1,0 +1,14 @@
+README
+======
+
+To override the stock vert.x Pump:
+
+ 1. Add a META-INF/services descriptor resource file for the PumpFactory pointing to a custom factory;
+ 2. Provide the custom factory implementation.
+
+ This implementation provides a custom PumpImpl class (almost completely identical to the standard one) with
+ just an extra method:
+
+ - long getBytesPumped();
+
+which returns the total number of bytes transferred by the pump so far.
