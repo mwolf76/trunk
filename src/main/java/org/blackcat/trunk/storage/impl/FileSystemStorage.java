@@ -19,12 +19,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.MessageFormat;
 import java.util.List;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static org.blackcat.trunk.util.Utils.urlEncode;
 
 public class FileSystemStorage implements Storage {
 
@@ -34,6 +29,8 @@ public class FileSystemStorage implements Storage {
 
     static private final OpenOptions openOptions =
             new OpenOptions();
+
+    static private final int readBufferSize = 262144; /* 256k */
 
     public FileSystemStorage(Vertx vertx, Logger logger, Path root) {
         this.vertx = vertx;
@@ -142,7 +139,6 @@ public class FileSystemStorage implements Storage {
                                             logger.warn( "Skipping unreadable directory: {0}", entryPath);
                                         }
                                     } else if (fileProps.isRegularFile()) {
-                                        String resourceURL = urlEncode(entryNameString);
                                         String mimeType = null;
 
                                         try {
@@ -170,12 +166,15 @@ public class FileSystemStorage implements Storage {
                     /* Regular file? */
                     else if (fileProperties.isRegularFile()) {
                         fileSystem.open(pathString, openOptions, openAsyncResult -> {
-                            AsyncFile asyncFile = openAsyncResult.result();
+                            AsyncFile asyncFile = openAsyncResult
+                                    .result()
+                                    .setReadBufferSize(readBufferSize);
 
                             try {
                                 String mimeType = Files.probeContentType(path);
                                 DocumentContentResource documentContentResource =
-                                        new DocumentContentResource(mimeType, fileProperties.size(), asyncFile, event -> {
+                                        new DocumentContentResource(mimeType, fileProperties.size(),
+                                                asyncFile, event -> {
                                             logger.trace("Closing input stream");
                                             asyncFile.close();
                                         });

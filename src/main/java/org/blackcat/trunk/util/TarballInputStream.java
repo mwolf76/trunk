@@ -1,6 +1,5 @@
 package org.blackcat.trunk.util;
 
-import io.vertx.core.file.FileProps;
 import org.blackcat.trunk.storage.Storage;
 import org.kamranzafar.jtar.TarEntry;
 import org.kamranzafar.jtar.TarOutputStream;
@@ -21,41 +20,34 @@ public class TarballInputStream extends InputStream {
 
     private boolean canceled;
 
-    public synchronized  boolean isCanceled() {
+    public synchronized boolean isCanceled() {
         return canceled;
     }
 
-    public synchronized  void setCanceled(boolean canceled) {
+    public synchronized void setCanceled(boolean canceled) {
         this.canceled = canceled;
     }
 
     private static final Logger logger = LoggerFactory.getLogger(AsyncInputStream.class);
 
     public TarballInputStream(Storage storage, Path collectionPath) throws IOException {
-
         in = new PipedInputStream();
         out = new TarOutputStream(new PipedOutputStream(in));
         canceled = false;
 
         new Thread(() -> {
 
-            List <Path> entries = null;
+            List<Path> entries = null;
             try (Stream<Path> pathStream = storage.streamDirectory(storage.getRoot().resolve(collectionPath))) {
-                entries = pathStream
-                        .filter(new Predicate<Path>() {
-                            @Override
-                            public boolean test(Path path) {
-                                try {
-                                    return storage.pathProperties(path).isRegularFile();
-                                }
-                                catch (IOException ioe) {
-                                    return false;
-                                }
-                            }
-                        })
-                        .collect(Collectors.toList());
+                entries = pathStream.filter(path -> {
+                    try {
+                        return storage.pathProperties(path).isRegularFile();
+                    } catch (IOException ioe) {
+                        return false;
+                    }
+                }).collect(Collectors.toList());
             } catch (IOException ioe) {
-                throw new RuntimeException("Can't collect filenames for archive.");
+                throw new RuntimeException("An error occurred while collecting entries for the archive.");
             }
             logger.info("collected {} entries", entries.size());
 
@@ -73,7 +65,7 @@ public class TarballInputStream extends InputStream {
                         int count;
                         byte data[] = new byte[1024];
 
-                        while (! isCanceled() && (count = origin.read(data)) != -1) {
+                        while (!isCanceled() && (count = origin.read(data)) != -1) {
                             out.write(data, 0, count);
                         }
 
@@ -96,7 +88,6 @@ public class TarballInputStream extends InputStream {
                 logger.error(ioe.toString());
                 throw new RuntimeException(ioe);
             }
-
         }).start();
     }
 

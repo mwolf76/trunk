@@ -64,6 +64,8 @@ public class RequestHandler implements Handler<HttpServerRequest> {
     private IDataStore dataStore;
     private Storage storage;
 
+    final static private int writeBufferSize = 262144; /* 256k */
+
     public RequestHandler(final Vertx vertx, final TemplateEngine templateEngine,
                           final Logger logger, final Configuration configuration,
                           final IDataStore dataStore, final Storage storage) {
@@ -475,22 +477,23 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                         });
 
                         /* setting up xfer */
-                        Pump pump = Pump.pump(asyncInputStream, ctx.response());
+                        Pump pump = Pump.pump(asyncInputStream, ctx.response(), writeBufferSize);
 
                         /* when all is done on the destination stream, report stats and close the response. */
                         asyncInputStream
                                 .exceptionHandler(cause -> {
                                     logger.error(cause.toString());
-                                });
-
-                        ctx
-                                .response()
+                                })
                                 .endHandler(event -> {
+                                    pump.stop();
                                     logger.info("... archive file transfer completed, {} bytes transferred.",
                                             ((PumpImpl) pump).getBytesPumped());
 
                                     done(ctx);
-                                })
+                                });
+
+                        ctx
+                                .response()
                                 .closeHandler(event -> {
                                     logger.info("interrupted by client");
                                     tarballInputStream.setCanceled(true);
@@ -650,11 +653,12 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                             .putHeader(Headers.CONTENT_LENGTH_HEADER,
                                     String.valueOf(documentContentResource.getLength()));
 
-                    Pump pump = Pump.pump(documentContentResource.getReadStream(), ctx.response());
+                    Pump pump = Pump.pump(documentContentResource.getReadStream(), ctx.response(), writeBufferSize);
 
                     /* when all is done on the source stream, report stats and close the response. */
                     documentContentResource.getReadStream()
                             .endHandler(event -> {
+                                pump.stop();
                                 logger.info("... outgoing file transfer completed, {} bytes transferred.",
                                         ((PumpImpl) pump).getBytesPumped());
 
@@ -737,9 +741,10 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                         (DocumentContentResource) resource;
 
                 /* setting up xfer */
-                Pump pump = Pump.pump(request, documentContentResource.getWriteStream());
+                Pump pump = Pump.pump(request, documentContentResource.getWriteStream(), writeBufferSize);
 
                 request.endHandler(event -> {
+                    pump.stop();
                     logger.info("... incoming file transfer completed, {} bytes transferred.",
                             ((PumpImpl) pump).getBytesPumped());
 

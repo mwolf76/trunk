@@ -1,20 +1,20 @@
 package org.blackcat.trunk.util;
 
+import io.vertx.core.*;
+import io.vertx.core.buffer.Buffer;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
+import io.vertx.core.streams.ReadStream;
+
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.spi.AbstractInterruptibleChannel;
 
-import io.vertx.core.AsyncResult;
-import io.vertx.core.Context;
-import io.vertx.core.Future;
-import io.vertx.core.Handler;
-import io.vertx.core.Vertx;
-import io.vertx.core.buffer.Buffer;
-import io.vertx.core.logging.Logger;
-import io.vertx.core.logging.LoggerFactory;
-import io.vertx.core.streams.ReadStream;
+import static io.netty.util.internal.ObjectUtil.checkNotNull;
 
 /**
  * Wraps a regular InputStream into an AsyncInput Stream that can be used with
@@ -25,22 +25,21 @@ import io.vertx.core.streams.ReadStream;
  */
 public class AsyncInputStream implements ReadStream<Buffer> {
 
-    // TODO: fix this to be in line with best performance
-    public static final int           DEFAULT_READ_BUFFER_SIZE = 8192;
-    private static final Logger       log                      = LoggerFactory.getLogger(AsyncInputStream.class);
+    public static final int DEFAULT_READ_BUFFER_SIZE = 262144; /* 256k */
+    private static final Logger logger = LoggerFactory.getLogger(AsyncInputStream.class);
 
     // Based on the inputStream with the real data
     private final ReadableByteChannel ch;
-    private final Vertx               vertx;
-    private final Context             context;
+    private final Vertx vertx;
+    private final Context context;
 
-    private boolean                   closed;
-    private boolean                   paused;
-    private boolean                   readInProgress;
+    private boolean closed;
+    private boolean paused;
+    private boolean readInProgress;
 
-    private Handler<Buffer>           dataHandler;
-    private Handler<Void>             endHandler;
-    private Handler<Throwable>        exceptionHandler;
+    private Handler<Buffer> dataHandler;
+    private Handler<Void> endHandler;
+    private Handler<Throwable> exceptionHandler;
 
     /**
      * Create a new Async InputStream that can we used with a Pump
@@ -50,7 +49,7 @@ public class AsyncInputStream implements ReadStream<Buffer> {
     public AsyncInputStream(final Vertx vertx, final InputStream in) {
         this.vertx = vertx;
         this.context = vertx.getOrCreateContext();
-        this.ch = Channels.newChannel(in);
+        this.ch = newChannel(in); /* copied from Channels.java */
     }
 
     public void close() {
@@ -169,7 +168,7 @@ public class AsyncInputStream implements ReadStream<Buffer> {
                     final Integer bytesRead = this.ch.read(buff);
                     future.complete(bytesRead);
                 } catch (final Exception e) {
-                    AsyncInputStream.log.error(e);
+                    AsyncInputStream.logger.error(e);
                     future.fail(e);
                 }
             } , res -> {
@@ -178,10 +177,13 @@ public class AsyncInputStream implements ReadStream<Buffer> {
                 } else {
                     // Buffer might be done
                     final Integer bytesRead = (Integer) res.result();
+
                     if (bytesRead < 0) {
                         // We are done, no more data to be expected
                         this.handleEnd();
                     } else {
+                        logger.debug("Read {} bytes", bytesRead);
+
                         buff.flip();
                         final Buffer vBuffer = Buffer.buffer(buff.limit());
                         vBuffer.setBytes(0, buff);
@@ -223,8 +225,82 @@ public class AsyncInputStream implements ReadStream<Buffer> {
         if ((this.exceptionHandler != null) && (t instanceof Exception)) {
             this.exceptionHandler.handle(t);
         } else {
-            AsyncInputStream.log.error("Unhandled exception", t);
+            AsyncInputStream.logger.error("Unhandled exception", t);
 
+        }
+    }
+
+    /**
+     * Constructs a channel that reads bytes from the given stream.
+     *
+     * <p> The resulting channel will not be buffered; it will simply redirect
+     * its I/O operations to the given stream.  Closing the channel will in
+     * turn cause the stream to be closed.  </p>
+     *
+     * @param  in
+     *         The stream from which bytes are to be read
+     *
+     * @return  A new readable byte channel
+     */
+    public static ReadableByteChannel newChannel(final InputStream in) {
+        checkNotNull(in, "in");
+
+        if (in instanceof FileInputStream &&
+                FileInputStream.class.equals(in.getClass())) {
+            return ((FileInputStream)in).getChannel();
+        }
+
+        return new ReadableByteChannelImpl(in);
+    }
+
+    private static class ReadableByteChannelImpl
+            extends AbstractInterruptibleChannel    // Not really interruptible
+            implements ReadableByteChannel
+    {
+        InputStream in;
+        private static final int TRANSFER_SIZE = 262144; /* 256k */
+        private byte buf[] = new byte[0];
+        private boolean open = true;
+        private Object readLock = new Object();
+
+        ReadableByteChannelImpl(InputStream in) {
+            this.in = in;
+        }
+
+        public int read(ByteBuffer dst) throws IOException {
+            int len = dst.remaining();
+            int totalRead = 0;
+            int bytesRead = 0;
+            synchronized (readLock) {
+                while (totalRead < len) {
+                    int bytesToRead = Math.min((len - totalRead),
+                            TRANSFER_SIZE);
+                    if (buf.length < bytesToRead)
+                        buf = new byte[bytesToRead];
+                    if ((totalRead > 0) && !(in.available() > 0))
+                        break; // block at most once
+                    try {
+                        begin();
+                        bytesRead = in.read(buf, 0, bytesToRead);
+                    } finally {
+                        end(bytesRead > 0);
+                    }
+                    if (bytesRead < 0)
+                        break;
+                    else
+                        totalRead += bytesRead;
+                    dst.put(buf, 0, bytesRead);
+                }
+                if ((bytesRead < 0) && (totalRead == 0))
+                    return -1;
+
+                return totalRead;
+            }
+        }
+
+        protected void implCloseChannel() throws IOException {
+            in.close();
+            open = false;
         }
     }
 }

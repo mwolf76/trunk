@@ -18,6 +18,8 @@ package org.blackcat.trunk.streams.impl;
 
 import io.vertx.core.Handler;
 import io.vertx.core.buffer.Buffer;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.streams.Pump;
 import io.vertx.core.streams.ReadStream;
 import io.vertx.core.streams.WriteStream;
@@ -51,6 +53,8 @@ public class PumpImpl<T> implements Pump {
     private int pumped;
     private long bytesPumped;
 
+    static private Logger logger;
+
     /**
      * Create a new {@code Pump} with the given {@code ReadStream} and {@code WriteStream}. Set the write queue max size
      * of the write stream to {@code maxWriteQueueSize}
@@ -61,12 +65,21 @@ public class PumpImpl<T> implements Pump {
     }
 
     PumpImpl(ReadStream<T> rs, WriteStream<T> ws) {
+        logger = LoggerFactory.getLogger(PumpImpl.class);
+
         this.readStream = rs;
         this.writeStream = ws;
-        drainHandler = v-> readStream.resume();
+
+        drainHandler = v -> {
+            readStream.resume();
+        };
+
         dataHandler = data -> {
+            Buffer buf = (Buffer) data;
+
             writeStream.write(data);
-            incPumped((Buffer) data);
+            incPumped(buf);
+
             if (writeStream.writeQueueFull()) {
                 readStream.pause();
                 writeStream.drainHandler(drainHandler);
@@ -88,6 +101,7 @@ public class PumpImpl<T> implements Pump {
      */
     @Override
     public PumpImpl start() {
+        logger.debug("pump started");
         readStream.handler(dataHandler);
         return this;
     }
@@ -97,6 +111,7 @@ public class PumpImpl<T> implements Pump {
      */
     @Override
     public PumpImpl stop() {
+        logger.debug("pump stopped");
         writeStream.drainHandler(null);
         readStream.handler(null);
         return this;
@@ -118,7 +133,11 @@ public class PumpImpl<T> implements Pump {
     // be called from the same thread so we benefit from bias locked optimisation which should give a very low
     // overhead
     private synchronized void incPumped(Buffer data) {
+        int written = data.length();
+
+        logger.debug("Wrote {} bytes", written);
+
         pumped ++;
-        bytesPumped += data.length();
+        bytesPumped += written;
     }
 }
