@@ -115,48 +115,55 @@ public class FileSystemStorage implements Storage {
                     if (fileProperties.isDirectory()) {
                         fileSystem.readDir(pathString, dirAsyncResult -> {
 
-                            CollectionResource collectionResource =
-                                    new CollectionResource();
+                            vertx.executeBlocking( future -> {
 
-                            for (String entry : dirAsyncResult.result()) {
-                                Path entryPath = Paths.get(entry);
-                                String entryPathString = entryPath.toString();
+                                CollectionResource collectionResource =
+                                        new CollectionResource();
 
-                                Path entryName = path.relativize(entryPath);
-                                String entryNameString = entryName.toString();
+                                for (String entry : dirAsyncResult.result()) {
+                                    Path entryPath = Paths.get(entry);
+                                    String entryPathString = entryPath.toString();
 
-                                /* ignore hidden files */
-                                if (entryNameString.startsWith("."))
-                                    continue;
+                                    Path entryName = path.relativize(entryPath);
+                                    String entryNameString = entryName.toString();
 
-                                FileProps fileProps = fileSystem.propsBlocking(entry);
-                                if (fileProps.isDirectory()) {
-                                    try {
-                                        List<String> nestedEntries = fileSystem.readDirBlocking(entryPathString);
+                                    /* ignore hidden files */
+                                    if (entryNameString.startsWith("."))
+                                        continue;
+
+                                    FileProps fileProps = fileSystem.propsBlocking(entry);
+                                    if (fileProps.isDirectory()) {
+                                        try {
+                                            List<String> nestedEntries = fileSystem.readDirBlocking(entryPathString);
+                                            collectionResource.addItem(
+                                                    new CollectionResource(
+                                                            entryNameString, nestedEntries.size()));
+                                        } catch (RuntimeException re) {
+                                            logger.warn( "Skipping unreadable directory: {0}", entryPath);
+                                        }
+                                    } else if (fileProps.isRegularFile()) {
+                                        String resourceURL = urlEncode(entryNameString);
+                                        String mimeType = null;
+
+                                        try {
+                                            mimeType = Files.probeContentType(entryPath);
+                                        } catch (IOException e) {
+                                            logger.warn("Could not determine mime type for {}", entryPath);
+                                        }
                                         collectionResource.addItem(
-                                                new CollectionResource(
-                                                        entryNameString, nestedEntries.size()));
-                                    } catch (RuntimeException re) {
-                                        logger.warn( "Skipping unreadable directory: {0}", entryPath);
+                                                new DocumentDescriptorResource(entryNameString, mimeType,
+                                                        fileProps.creationTime(), fileProps.lastModifiedTime(),
+                                                        fileProps.lastAccessTime(), fileProps.size()));
+                                    } else {
+                                        logger.warn("Unexpected filesystem object: {0}", entryName);
                                     }
-                                } else if (fileProps.isRegularFile()) {
-                                    String resourceURL = urlEncode(entryNameString);
-                                    String mimeType = null;
-                                    try {
-                                        mimeType = Files.probeContentType(entryPath);
-                                    } catch (IOException e) {
-                                        logger.warn("Could not determine mime type for {}", entryPath);
-                                    }
-                                    collectionResource.addItem(
-                                            new DocumentDescriptorResource(entryNameString, mimeType,
-                                                    fileProps.creationTime(), fileProps.lastModifiedTime(),
-                                                    fileProps.lastAccessTime(), fileProps.size()));
-                                } else {
-                                    logger.warn("Unexpected filesystem object: {0}", entryName);
                                 }
-                            }
 
-                            resourceHandler.handle(collectionResource);
+                                future.complete(collectionResource);
+                            }, done -> {
+                                final CollectionResource collectionResource = (CollectionResource) done.result();
+                                resourceHandler.handle(collectionResource);
+                            });
                         });
                     }
 
