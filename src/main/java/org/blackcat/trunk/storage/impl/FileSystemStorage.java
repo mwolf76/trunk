@@ -30,8 +30,6 @@ public class FileSystemStorage implements Storage {
     static private final OpenOptions openOptions =
             new OpenOptions();
 
-    static private final int readBufferSize = 262144; /* 256k */
-
     public FileSystemStorage(Vertx vertx, Logger logger, Path root) {
         this.vertx = vertx;
         this.logger = logger;
@@ -166,10 +164,7 @@ public class FileSystemStorage implements Storage {
                     /* Regular file? */
                     else if (fileProperties.isRegularFile()) {
                         fileSystem.open(pathString, openOptions, openAsyncResult -> {
-                            AsyncFile asyncFile = openAsyncResult
-                                    .result()
-                                    .setReadBufferSize(readBufferSize);
-
+                            AsyncFile asyncFile = openAsyncResult.result();
                             try {
                                 String mimeType = Files.probeContentType(path);
                                 DocumentContentResource documentContentResource =

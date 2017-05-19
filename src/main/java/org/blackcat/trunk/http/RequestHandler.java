@@ -64,8 +64,6 @@ public class RequestHandler implements Handler<HttpServerRequest> {
     private IDataStore dataStore;
     private Storage storage;
 
-    final static private int writeBufferSize = 262144; /* 256k */
-
     public RequestHandler(final Vertx vertx, final TemplateEngine templateEngine,
                           final Logger logger, final Configuration configuration,
                           final IDataStore dataStore, final Storage storage) {
@@ -477,7 +475,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                         });
 
                         /* setting up xfer */
-                        Pump pump = Pump.pump(asyncInputStream, ctx.response(), writeBufferSize);
+                        Pump pump = Pump.pump(asyncInputStream, ctx.response());
 
                         /* when all is done on the destination stream, report stats and close the response. */
                         asyncInputStream
@@ -653,7 +651,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                             .putHeader(Headers.CONTENT_LENGTH_HEADER,
                                     String.valueOf(documentContentResource.getLength()));
 
-                    Pump pump = Pump.pump(documentContentResource.getReadStream(), ctx.response(), writeBufferSize);
+                    Pump pump = Pump.pump(documentContentResource.getReadStream(), ctx.response(), 8192);
 
                     /* when all is done on the source stream, report stats and close the response. */
                     documentContentResource.getReadStream()
@@ -741,9 +739,11 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                         (DocumentContentResource) resource;
 
                 /* setting up xfer */
-                Pump pump = Pump.pump(request, documentContentResource.getWriteStream(), writeBufferSize);
+                Pump pump = Pump.pump(request, documentContentResource.getWriteStream());
 
                 request.endHandler(event -> {
+
+
                     logger.info("... incoming file transfer completed, {} bytes transferred.",
                             ((PumpImpl) pump).getBytesPumped());
 

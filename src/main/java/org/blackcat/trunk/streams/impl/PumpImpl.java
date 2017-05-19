@@ -77,6 +77,7 @@ public class PumpImpl<T> implements Pump {
         dataHandler = data -> {
             Buffer buf = (Buffer) data;
 
+            logger.debug("writing {} bytes", buf.length());
             writeStream.write(data);
             incPumped(buf);
 
@@ -134,8 +135,6 @@ public class PumpImpl<T> implements Pump {
     // overhead
     private synchronized void incPumped(Buffer data) {
         int written = data.length();
-
-        logger.debug("Wrote {} bytes", written);
 
         pumped ++;
         bytesPumped += written;
