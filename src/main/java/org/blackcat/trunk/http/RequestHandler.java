@@ -702,7 +702,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
 
         final HttpServerRequest request = ctx
                 .request()
-                .setExpectMultipart(true);
+                .pause(); /* hold it */
 
         Path protectedPath = protectedPath(ctx);
 
@@ -750,7 +750,9 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                 });
 
                 logger.info("incoming file transfer started ...");
+
                 pump.start();
+                request.resume();
             }
         });
     }
