@@ -410,8 +410,6 @@ public class RequestHandler implements Handler<HttpServerRequest> {
         MultiMap headers = request.headers();
         String etag = headers.get(Headers.IF_NONE_MATCH_HEADER);
 
-
-
         Path resolvedPath = storage.getRoot().resolve(protectedPath);
         logger.trace("GET {} -> {} [etag: {}]",
                 protectedPath.toString(), resolvedPath.toString(), etag);
@@ -498,8 +496,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                                 });
 
                         logger.info("archive file transfer started for {} ...", archiveName);
-                        pump
-                                .start();
+                        pump.start();
                     }
                     catch (IOException ioe) {
                         logger.error(ioe.toString());
@@ -703,7 +700,10 @@ public class RequestHandler implements Handler<HttpServerRequest> {
     /* POSTs are used to create/update documents */
     private void postResource(RoutingContext ctx) {
 
-        final HttpServerRequest request = ctx.request();
+        final HttpServerRequest request = ctx
+                .request()
+                .setExpectMultipart(true);
+
         Path protectedPath = protectedPath(ctx);
 
         MultiMap headers = request.headers();
@@ -742,8 +742,6 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                 Pump pump = Pump.pump(request, documentContentResource.getWriteStream());
 
                 request.endHandler(event -> {
-
-
                     logger.info("... incoming file transfer completed, {} bytes transferred.",
                             ((PumpImpl) pump).getBytesPumped());
 
@@ -751,7 +749,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                             .handle(null);
                 });
 
-                logger.trace("incoming file transfer started ...");
+                logger.info("incoming file transfer started ...");
                 pump.start();
             }
         });
