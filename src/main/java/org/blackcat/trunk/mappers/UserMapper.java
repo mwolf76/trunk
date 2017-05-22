@@ -45,4 +45,6 @@ final public class UserMapper {
                 ", uuid='" + uuid + '\'' +
                 '}';
     }
+
+    public static UserMapper nullInstance = new UserMapper();
 }

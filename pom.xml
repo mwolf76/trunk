@@ -141,7 +141,7 @@
                                         implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <manifestEntries>
                                         <Main-Class>io.vertx.core.Launcher</Main-Class>
-                                        <Main-Verticle>org.blackcat.trunk.verticles.TrunkVerticle</Main-Verticle>
+                                        <Main-Verticle>org.blackcat.trunk.verticles.MainVerticle</Main-Verticle>
                                     </manifestEntries>
                                 </transformer>
                             </transformers>

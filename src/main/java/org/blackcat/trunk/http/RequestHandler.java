@@ -1,12 +1,6 @@
 package org.blackcat.trunk.http;
 
 import com.mitchellbosecke.pebble.utils.Pair;
-import de.braintags.io.vertx.pojomapper.IDataStore;
-import de.braintags.io.vertx.pojomapper.dataaccess.query.IQuery;
-import de.braintags.io.vertx.pojomapper.dataaccess.query.IQueryResult;
-import de.braintags.io.vertx.pojomapper.dataaccess.write.IWrite;
-import de.braintags.io.vertx.pojomapper.dataaccess.write.IWriteEntry;
-import de.braintags.io.vertx.pojomapper.dataaccess.write.IWriteResult;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.MultiMap;
@@ -29,6 +23,7 @@ import io.vertx.ext.web.handler.*;
 import io.vertx.ext.web.sstore.LocalSessionStore;
 import io.vertx.ext.web.templ.TemplateEngine;
 import org.blackcat.trunk.conf.Configuration;
+import org.blackcat.trunk.eventbus.data.QueryType;
 import org.blackcat.trunk.mappers.ShareMapper;
 import org.blackcat.trunk.mappers.UserMapper;
 import org.blackcat.trunk.resource.Resource;
@@ -40,7 +35,6 @@ import org.blackcat.trunk.storage.Storage;
 import org.blackcat.trunk.streams.impl.PumpImpl;
 import org.blackcat.trunk.util.AsyncInputStream;
 import org.blackcat.trunk.util.TarballInputStream;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -48,7 +42,6 @@ import java.nio.file.Paths;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -61,18 +54,16 @@ public class RequestHandler implements Handler<HttpServerRequest> {
     private Router router;
     private TemplateEngine templateEngine;
     private Logger logger;
-    private IDataStore dataStore;
     private Storage storage;
 
     public RequestHandler(final Vertx vertx, final TemplateEngine templateEngine,
                           final Logger logger, final Configuration configuration,
-                          final IDataStore dataStore, final Storage storage) {
+                          final Storage storage) {
 
         this.vertx = vertx;
         this.router = Router.router(vertx);
         this.templateEngine = templateEngine;
         this.logger = logger;
-        this.dataStore = dataStore;
         this.storage = storage;
 
         // We need cookies, sessions and request bodies
@@ -220,7 +211,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
 
     @Override
     public void handle(HttpServerRequest request) {
-        logger.info("Accepting HTTP Request: {} {} ...", request.method(), request.uri());
+        logger.debug("Accepting HTTP Request: {} {} ...", request.method(), request.uri());
         router.accept(request);
     }
 
@@ -256,33 +247,27 @@ public class RequestHandler implements Handler<HttpServerRequest> {
         String collectionPathString = collectionPath.toString();
 
         String email = getSessionUserEmail(ctx);
-
         findCreateUserEntityByEmail(email, userMapper -> {
-            if (userMapper != null) {
-                findShareEntity(collectionPath, shareMapper -> {
-                    JsonArray jsonArray = new JsonArray();
 
-                    if (shareMapper != null) {
-                        List<String> authorizedUsers = shareMapper.getAuthorizedUsers();
-                        for (String authorizedUser : authorizedUsers) {
-                            jsonArray.add(authorizedUser);
-                        }
-                    }
+            findShareEntity(collectionPath, shareMapper -> {
+                JsonArray jsonArray = new JsonArray();
 
-                    String body = new JsonObject()
-                            .put("data", new JsonObject()
-                                    .put("collectionPath", collectionPathString)
-                                    .put("authorizedUsers", jsonArray))
-                            .encodePrettily();
+                List<String> authorizedUsers = shareMapper.getAuthorizedUsers();
+                for (String authorizedUser : authorizedUsers) {
+                    jsonArray.add(authorizedUser);
+                }
 
-                    ctx.response()
-                            .putHeader(Headers.CONTENT_LENGTH_HEADER, String.valueOf(body.length()))
-                            .putHeader(Headers.CONTENT_TYPE_HEADER, "application/json; charset=utf-8")
-                            .end(body);
-                });
-            } else {
-                forbidden(ctx);
-            }
+                String body = new JsonObject()
+                        .put("data", new JsonObject()
+                                .put("collectionPath", collectionPathString)
+                                .put("authorizedUsers", jsonArray))
+                        .encodePrettily();
+
+                ctx.response()
+                        .putHeader(Headers.CONTENT_LENGTH_HEADER, String.valueOf(body.length()))
+                        .putHeader(Headers.CONTENT_TYPE_HEADER, "application/json; charset=utf-8")
+                        .end(body);
+            });
         });
     }
 
@@ -302,6 +287,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
             return;
         }
 
+        /* TODO: review this */
         JsonArray authorizedUsers = null;
         try {
             authorizedUsers = json.getJsonArray("authorizedUsers");
@@ -376,8 +362,9 @@ public class RequestHandler implements Handler<HttpServerRequest> {
         findCreateUserEntityByEmail(email, userMapper -> {
 
             /* check for ownership */
-            if (userMapper != null && protectedPath.startsWith(Paths.get(userMapper.getUuid()))) {
-                logger.info("Ownership granted to user {}. No further auth checks required.", userMapper.getEmail());
+            if (protectedPath.startsWith(Paths.get(userMapper.getUuid()))) {
+                logger.debug("Ownership granted to user {}. No further auth checks required.",
+                        userMapper.getEmail());
 
                 findShareEntity(protectedPath, shareMapper -> {
                     getResourceAux(ctx, true, shareMapper);
@@ -386,14 +373,17 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                 /* not the owner, authorized? */
                 findShareEntity(protectedPath, shareMapper -> {
 
-                    if (userMapper != null && shareMapper != null &&
-                            shareMapper.isAuthorized(userMapper.getEmail())) {
+                    if (shareMapper.isAuthorized(userMapper.getEmail())) {
 
-                        logger.info("Auth granted by sharing permissions to user {}.", userMapper.getEmail());
+                        logger.info("Auth granted by sharing permissions to user {}.",
+                                userMapper.getEmail());
+
                         getResourceAux(ctx, false, shareMapper);
                     }
                     else {
-                        logger.warn("Not the owner, nor sharing permission exists: Access denied.");
+                        logger.warn("Not the owner, nor sharing permission exists for user {}. Access denied.",
+                                userMapper.getEmail());
+
                         forbidden(ctx);
                     }
                 });
@@ -530,8 +520,8 @@ public class RequestHandler implements Handler<HttpServerRequest> {
 
                     if (isOwner) {
                         ctx
-                                .put("authorizedUsers", shareMapper == null
-                                        ? "" : String.join("; ", shareMapper.getAuthorizedUsers()));
+                                .put("authorizedUsers",
+                                        String.join("; ", shareMapper.getAuthorizedUsers()));
                     }
                     else {
                         ctx
@@ -787,7 +777,6 @@ public class RequestHandler implements Handler<HttpServerRequest> {
         });
     }
 
-    /** Entity manipulation *******************************************************************************************/
     /**
      * Retrieves a User entity by email, or creates a new one if no such entity exists.
      *
@@ -795,59 +784,16 @@ public class RequestHandler implements Handler<HttpServerRequest> {
      * @param handler
      */
     private void findCreateUserEntityByEmail(String email, Handler<UserMapper> handler) {
-        IQuery<UserMapper> query = dataStore.createQuery(UserMapper.class);
-        query.field("email").is(email);
-        query.execute(queryAsyncResult -> {
-            if (queryAsyncResult.failed()) {
-                Throwable cause = queryAsyncResult.cause();
+        JsonObject query = new JsonObject()
+                .put("type", QueryType.FIND_CREATE_USER.getTag())
+                .put("params", new JsonObject()
+                        .put("email", email));
 
-                logger.error(cause);
-                throw new RuntimeException(cause);
-            } else {
-                IQueryResult<UserMapper> queryResult = queryAsyncResult.result();
-                if (! queryResult.isEmpty()) {
-                    queryResult.iterator().next(nextAsyncResult -> {
-                        if (nextAsyncResult.failed()) {
-                            Throwable cause = nextAsyncResult.cause();
-
-                            logger.error(cause);
-                            throw new RuntimeException(cause);
-                        } else {
-                            UserMapper userMapper = nextAsyncResult.result();
-
-                            logger.trace("Found matching user for {}: {}", email, userMapper);
-                            handler.handle(userMapper);
-                        }
-                    });
-                }
-                else {
-                    /* does not exist. create it */
-                    UserMapper userMapper = new UserMapper();
-                    userMapper.setEmail(email);
-                    userMapper.setUuid(UUID.randomUUID().toString());
-
-                    IWrite<UserMapper> write = dataStore.createWrite(UserMapper.class);
-                    write.add(userMapper);
-
-                    write.save(result -> {
-                        if (result.failed()) {
-                            Throwable cause = result.cause();
-
-                            logger.error(cause.toString());
-                            throw new RuntimeException(cause);
-                        } else {
-                            IWriteResult writeResult = result.result();
-                            IWriteEntry entry = writeResult.iterator().next();
-
-                            logger.trace( "Created new userMapper for {}: {}", email, entry.getStoreObject());
-
-                            /* verify if home directory for this user exists, create it if not. */
-                            storage.checkUserDirectory(userMapper, event -> {
-                                handler.handle(userMapper);
-                            });
-                        }
-                    });
-                }
+        vertx.eventBus().send("data-store", query, reply -> {
+            if (reply.succeeded()) {
+                JsonObject obj = (JsonObject) reply.result().body();
+                UserMapper userMapper = obj.mapTo(UserMapper.class);
+                handler.handle(userMapper);
             }
         });
     }
@@ -856,44 +802,29 @@ public class RequestHandler implements Handler<HttpServerRequest> {
      * Updates the sharing entity corresponding to collectionPath if such entity exists.
      * Creates a new one otherwise.
      *
+     * @param owner
      * @param collectionPath
-     * @param newAuthorizedUsers
+     * @param authorizedUsers
      * @param handler
      */
     private void findUpdateShareEntity(UserMapper owner, Path collectionPath,
-                                       List<String> newAuthorizedUsers, Handler<Void> handler) {
+                                       List<String> authorizedUsers, Handler<ShareMapper> handler) {
 
-        findShareEntity(collectionPath, shareMapper -> {
+        JsonObject query = new JsonObject()
+                .put("type", QueryType.FIND_UPDATE_SHARE.getTag())
+                .put("params", new JsonObject()
+                        .put("owner", JsonObject.mapFrom(owner))
+                        .put("collectionPath", collectionPath.toString())
+                        .put("authorizedUsers", new JsonArray(authorizedUsers)));
 
-            IWrite<ShareMapper> shareWrite = dataStore.createWrite(ShareMapper.class);
-
-            /* no such entity exists, create a new one */
-            if (shareMapper == null) {
-                shareMapper = new ShareMapper();
-                shareMapper.setOwner(owner);
-                shareMapper.setCollectionPath(collectionPath.toString());
+        vertx.eventBus().send("data-store", query, reply -> {
+            if (reply.succeeded()) {
+                JsonObject obj = (JsonObject) reply.result().body();
+                ShareMapper shareMapper = obj.mapTo(ShareMapper.class);
+                handler.handle(shareMapper);
             }
-
-            /* update authorized users list */
-            shareMapper.setAuthorizedUsers(newAuthorizedUsers);
-
-            shareWrite.add(shareMapper);
-            shareWrite.save(shareWriteAsyncResult -> {
-                if (shareWriteAsyncResult.failed()) {
-                    Throwable cause = shareWriteAsyncResult.cause();
-
-                    logger.error(cause);
-                    throw new RuntimeException(cause);
-                } else {
-                    IWriteResult shareWriteResult = shareWriteAsyncResult.result();
-                    IWriteEntry shareWriteEntry = shareWriteResult.iterator().next();
-                    logger.trace("{} {}",
-                            shareWriteEntry.getAction(),
-                            shareWriteEntry.getStoreObject());
-                    handler.handle(null); /* done */
-                }
-            });
         });
+
     } /* findUpdateShareEntity() */
 
     /**
@@ -903,39 +834,16 @@ public class RequestHandler implements Handler<HttpServerRequest> {
      * @param handler
      */
     private void findShareEntity(Path collectionPath, Handler<ShareMapper> handler) {
-        final String collectionPathString = collectionPath.toString();
+        JsonObject query = new JsonObject()
+                .put("type", QueryType.FIND_SHARE.getTag())
+                .put("params", new JsonObject()
+                        .put("collectionPath", collectionPath.toString()));
 
-        IQuery<ShareMapper> shareQuery = dataStore.createQuery(ShareMapper.class);
-        shareQuery.field("collectionPath").is(collectionPathString);
-        shareQuery.execute(shareQueryAsyncResult -> {
-
-            if (shareQueryAsyncResult.failed()) {
-                Throwable cause = shareQueryAsyncResult.cause();
-
-                logger.error(cause);
-                throw new RuntimeException(cause);
-            } else {
-                IQueryResult<ShareMapper> shareQueryResult = shareQueryAsyncResult.result();
-                if (! shareQueryResult.isEmpty()) {
-                    shareQueryResult.iterator().next(shareNextAsyncResult -> {
-                        if (shareNextAsyncResult.failed()) {
-                            Throwable cause = shareNextAsyncResult.cause();
-
-                            logger.error(cause);
-                            throw new RuntimeException(cause);
-                        } else {
-                            ShareMapper shareMapper = shareNextAsyncResult.result();
-
-                            /* found share record */
-                            logger.trace("Found sharing info {} for {}", shareMapper, collectionPath);
-                            handler.handle(shareMapper);
-                        }
-                    });
-                }
-                else {
-                    logger.trace("No sharing info found for {}", collectionPath);
-                    handler.handle(null);
-                }
+        vertx.eventBus().send("data-store", query, reply -> {
+            if (reply.succeeded()) {
+                JsonObject obj = (JsonObject) reply.result().body();
+                ShareMapper shareMapper = obj.mapTo(ShareMapper.class);
+                handler.handle(shareMapper);
             }
         });
     } /* findShareEntity() */
@@ -1124,7 +1032,6 @@ public class RequestHandler implements Handler<HttpServerRequest> {
         return email;
     }
 
-    @NotNull
     private static String buildBackLink(int index) {
         StringBuilder sb = new StringBuilder();
 
@@ -1135,7 +1042,6 @@ public class RequestHandler implements Handler<HttpServerRequest> {
         return sb.toString();
     }
 
-    @NotNull
     private static String chopString(String s) {
         return s.substring(0, s.length() -2);
     }

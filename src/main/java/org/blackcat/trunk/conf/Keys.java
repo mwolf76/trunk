@@ -16,6 +16,9 @@ public class Keys {
     static String SERVER_KEYSTORE_PASSWORD = "keystorePassword";
     static String DEFAULT_SERVER_KEYSTORE_PASSWORD = "password";
 
+    static String SERVER_TIMEOUT = "timeout";
+    static int DEFAULT_SERVER_TIMEOUT = 30;
+
     /* STORAGE */
     static String STORAGE_SECTION = "storage";
     static String STORAGE_ROOT = "root";

@@ -72,4 +72,6 @@ final public class ShareMapper {
                 ", authorizedUsers=" + authorizedUsers +
                 '}';
     }
+
+    public final static ShareMapper nullInstance = new ShareMapper();
 }

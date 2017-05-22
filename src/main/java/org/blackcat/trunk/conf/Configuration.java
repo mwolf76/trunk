@@ -17,6 +17,7 @@ final public class Configuration {
     private boolean useSSL;
     private String keystoreFilename;
     private String keystorePassword;
+    private int timeout;
 
     /* database section */
     private String dbType;
@@ -49,6 +50,10 @@ final public class Configuration {
         return keystorePassword;
     }
 
+    public int getTimeout() {
+        return timeout;
+    }
+
     void parseServerSection(JsonObject jsonObject) {
         final JsonObject serverSection = jsonObject.getJsonObject(SERVER_SECTION);
 
@@ -58,6 +63,7 @@ final public class Configuration {
             this.keystoreFilename = serverSection.getString(SERVER_KEYSTORE_FILENAME, DEFAULT_SERVER_KEYSTORE_FILENAME);
             this.keystorePassword = serverSection.getString(SERVER_KEYSTORE_PASSWORD, DEFAULT_SERVER_KEYSTORE_PASSWORD);
         }
+        this.timeout = serverSection.getInteger(SERVER_TIMEOUT, DEFAULT_SERVER_TIMEOUT);
     }
 
     public String getOauth2Provider() {
@@ -143,6 +149,7 @@ final public class Configuration {
                 ", useSSL=" + useSSL +
                 ", keystoreFilename='" + keystoreFilename + '\'' +
                 ", keystorePassword='" + keystorePassword + '\'' +
+                ", timeout=" + timeout +
                 ", dbType='" + dbType + '\'' +
                 ", dbHost='" + dbHost + '\'' +
                 ", dbPort=" + dbPort +
