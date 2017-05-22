@@ -34,7 +34,6 @@ public class DataStoreVerticle extends AbstractVerticle {
 
             /* retrieve configuration object from vert.x ctx */
             final Configuration configuration = new Configuration(vertx.getOrCreateContext().config());
-            logger.info("Configuration: {}", configuration.toString());
 
             /* connect to mongo data store */
             String connectionString = String.format("%s://%s:%s",
