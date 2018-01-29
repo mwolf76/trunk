@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.function.Predicate;
+import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -37,7 +37,7 @@ public class TarballInputStream extends InputStream {
 
         new Thread(() -> {
 
-            List<Path> entries = null;
+            List<Path> entries;
             try (Stream<Path> pathStream = storage.streamDirectory(storage.getRoot().resolve(collectionPath))) {
                 entries = pathStream.filter(path -> {
                     try {
@@ -60,7 +60,7 @@ public class TarballInputStream extends InputStream {
                     out.putNextEntry(tarEntry);
 
                     try (BufferedInputStream origin =
-                                 new BufferedInputStream(new FileInputStream(file))) {
+                             new BufferedInputStream(new FileInputStream(file))) {
 
                         int count;
                         byte data[] = new byte[1024];

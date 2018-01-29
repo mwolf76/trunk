@@ -7,8 +7,10 @@ import de.braintags.io.vertx.pojomapper.dataaccess.write.IWriteEntry;
 import de.braintags.io.vertx.pojomapper.dataaccess.write.IWriteResult;
 import de.braintags.io.vertx.pojomapper.mongo.MongoDataStore;
 import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Context;
 import io.vertx.core.Future;
 import io.vertx.core.Handler;
+import io.vertx.core.eventbus.EventBus;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -21,66 +23,70 @@ import org.blackcat.trunk.mappers.UserMapper;
 import java.util.List;
 import java.util.UUID;
 
-public class DataStoreVerticle extends AbstractVerticle {
+final public class DataStoreVerticle extends AbstractVerticle {
 
     private Logger logger;
     private MongoDataStore mongoDataStore;
 
     @Override
     public void start(Future<Void> startFuture) {
+        initLogger();
 
-        logger = LoggerFactory.getLogger(DataStoreVerticle.class);
-        vertx.executeBlocking(future -> {
+        Context context = vertx.getOrCreateContext();
 
-            /* retrieve configuration object from vert.x ctx */
-            final Configuration configuration = new Configuration(vertx.getOrCreateContext().config());
+        Configuration configuration = new Configuration(context.config());
+        String connectionString = String.format("%s://%s:%s",
+            configuration.getDatabaseType(),
+            configuration.getDatabaseHost(),
+            configuration.getDatabasePort());
 
-            /* connect to mongo data store */
-            String connectionString = String.format("%s://%s:%s",
-                    configuration.getDatabaseType(),
-                    configuration.getDatabaseHost(),
-                    configuration.getDatabasePort());
+        JsonObject mongoConfig = new JsonObject()
+                                     .put("connection_string", connectionString)
+                                     .put("db_name", configuration.getDatabaseName());
 
-            JsonObject mongoConfig = new JsonObject()
-                    .put("connection_string", connectionString)
-                    .put("db_name", configuration.getDatabaseName());
+        MongoClient mongoClient = MongoClient.createShared(vertx, mongoConfig);
+        mongoDataStore = new MongoDataStore(vertx, mongoClient, mongoConfig);
 
-            MongoClient mongoClient = MongoClient.createShared(vertx, mongoConfig);
-            mongoDataStore = new MongoDataStore(vertx, mongoClient, mongoConfig);
-
-            vertx.eventBus()
-                    .consumer("data-store", msg -> {
-                        JsonObject obj = (JsonObject) msg.body();
-                        String queryType = obj.getString("type");
-                        JsonObject params = obj.getJsonObject("params");
-
-                        /* msg dispatch */
-                        if (queryType.equals(QueryType.FIND_CREATE_USER.getTag())) {
-                            findCreateUser(params, user -> {
-                                msg.reply(JsonObject.mapFrom(user));
-                            });
-                        } else if (queryType.equals(QueryType.FIND_SHARE.getTag())) {
-                            findShare(params, share -> {
-                               msg.reply(JsonObject.mapFrom(share));
-                            });
-                        } else if (queryType.equals(QueryType.FIND_UPDATE_SHARE.getTag())) {
-                            findUpdateShare(params, share -> {
-                                msg.reply(JsonObject.mapFrom(share));
-                            });
-                        } else {
-                            logger.error("Unsupported query type: {}", queryType);
-                        }
-                    });
-
-            future.complete();
-        }, res -> {
-            if (res.succeeded()) {
+        /* this query is only used to determine if mongo server is alive and well... */
+        mongoClient.getCollections(ar -> {
+            if (ar.succeeded()) {
+                List<String> result = ar.result();
+                result.stream().forEach(System.out::println);
+                setupMessageHandlers();
                 startFuture.complete();
-            } else {
-                Throwable cause = res.cause();
-                startFuture.fail(cause);
             }
         });
+    }
+
+    private void initLogger() {
+        logger = LoggerFactory.getLogger(DataStoreVerticle.class);
+    }
+
+    private void setupMessageHandlers() {
+        EventBus eventBus = vertx.eventBus();
+        eventBus
+            .consumer("data-store", msg -> {
+                JsonObject obj = (JsonObject) msg.body();
+                String queryType = obj.getString("type");
+                JsonObject params = obj.getJsonObject("params");
+
+                /* msg dispatch */
+                if (queryType.equals(QueryType.FIND_CREATE_USER.getTag())) {
+                    findCreateUser(params, user -> {
+                        msg.reply(JsonObject.mapFrom(user));
+                    });
+                } else if (queryType.equals(QueryType.FIND_SHARE.getTag())) {
+                    findShare(params, share -> {
+                        msg.reply(JsonObject.mapFrom(share));
+                    });
+                } else if (queryType.equals(QueryType.FIND_UPDATE_SHARE.getTag())) {
+                    findUpdateShare(params, share -> {
+                        msg.reply(JsonObject.mapFrom(share));
+                    });
+                } else {
+                    logger.error("Unsupported query type: {}", queryType);
+                }
+            });
     }
 
     private void findCreateUser(JsonObject params, Handler<UserMapper> handler) {

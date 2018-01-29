@@ -2,6 +2,7 @@ package org.blackcat.trunk.resource.impl;
 
 import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
+import org.blackcat.trunk.http.ResponseBuilder;
 import org.blackcat.trunk.util.Utils;
 
 import java.time.Instant;
@@ -72,7 +73,7 @@ final public class DocumentDescriptorResource extends BaseResource {
     }
 
     public String getHumanLength() {
-        return Utils.humanReadableByteCount(length, true);
+        return Utils.humanReadableByteCount(length);
     }
 
     public String getMetadata() {

@@ -18,8 +18,7 @@ final public class ShareMapper {
 
     private List<String> authorizedUsers;
 
-    public ShareMapper()
-    {
+    public ShareMapper() {
         authorizedUsers = new ArrayList<>();
     }
 
@@ -47,7 +46,6 @@ final public class ShareMapper {
         this.owner = owner;
     }
 
-    @org.jetbrains.annotations.Contract(" -> !null")
     public List<String> getAuthorizedUsers() {
         return new ArrayList<>(authorizedUsers);
     }
@@ -72,6 +70,4 @@ final public class ShareMapper {
                 ", authorizedUsers=" + authorizedUsers +
                 '}';
     }
-
-    public final static ShareMapper nullInstance = new ShareMapper();
 }

@@ -23,12 +23,11 @@ import java.util.stream.Stream;
 
 public class FileSystemStorage implements Storage {
 
+    static private final OpenOptions openOptions = new OpenOptions();
+
     private Vertx vertx;
     private Logger logger;
     private Path root;
-
-    static private final OpenOptions openOptions =
-            new OpenOptions();
 
     public FileSystemStorage(Vertx vertx, Logger logger, Path root) {
         this.vertx = vertx;
@@ -60,8 +59,8 @@ public class FileSystemStorage implements Storage {
                         handler.handle(null); /* all good */
                     } else {
                         throw new FileSystemException(MessageFormat.format(
-                                "Path {0} already exists and it's not a directory.",
-                                userDirectoryPath
+                            "Path {0} already exists and it's not a directory.",
+                            userDirectoryPath
                         ));
                     }
                 });
@@ -71,8 +70,8 @@ public class FileSystemStorage implements Storage {
                         handler.handle(null); /* all good */
                     else {
                         throw new FileSystemException(MessageFormat.format(
-                                "Could not make directory {0} for user {1}.",
-                                userDirectoryPath, userMapper.getEmail()));
+                            "Could not make directory {0} for user {1}.",
+                            userDirectoryPath, userMapper.getEmail()));
                     }
                 });
             }
@@ -110,10 +109,10 @@ public class FileSystemStorage implements Storage {
                     if (fileProperties.isDirectory()) {
                         fileSystem.readDir(pathString, dirAsyncResult -> {
 
-                            vertx.executeBlocking( future -> {
+                            vertx.executeBlocking(future -> {
 
                                 CollectionResource collectionResource =
-                                        new CollectionResource();
+                                    new CollectionResource();
 
                                 for (String entry : dirAsyncResult.result()) {
                                     Path entryPath = Paths.get(entry);
@@ -131,10 +130,10 @@ public class FileSystemStorage implements Storage {
                                         try {
                                             List<String> nestedEntries = fileSystem.readDirBlocking(entryPathString);
                                             collectionResource.addItem(
-                                                    new CollectionResource(
-                                                            entryNameString, nestedEntries.size()));
+                                                new CollectionResource(
+                                                    entryNameString, nestedEntries.size()));
                                         } catch (RuntimeException re) {
-                                            logger.warn( "Skipping unreadable directory: {0}", entryPath);
+                                            logger.warn("Skipping unreadable directory: {0}", entryPath);
                                         }
                                     } else if (fileProps.isRegularFile()) {
                                         String mimeType = null;
@@ -145,9 +144,9 @@ public class FileSystemStorage implements Storage {
                                             logger.warn("Could not determine mime type for {}", entryPath);
                                         }
                                         collectionResource.addItem(
-                                                new DocumentDescriptorResource(entryNameString, mimeType,
-                                                        fileProps.creationTime(), fileProps.lastModifiedTime(),
-                                                        fileProps.lastAccessTime(), fileProps.size()));
+                                            new DocumentDescriptorResource(entryNameString, mimeType,
+                                                fileProps.creationTime(), fileProps.lastModifiedTime(),
+                                                fileProps.lastAccessTime(), fileProps.size()));
                                     } else {
                                         logger.warn("Unexpected filesystem object: {0}", entryName);
                                     }
@@ -168,15 +167,14 @@ public class FileSystemStorage implements Storage {
                             try {
                                 String mimeType = Files.probeContentType(path);
                                 DocumentContentResource documentContentResource =
-                                        new DocumentContentResource(mimeType, fileProperties.size(),
-                                                asyncFile, event -> {
-                                            logger.trace("Closing input stream");
-                                            asyncFile.close();
-                                        });
+                                    new DocumentContentResource(mimeType, fileProperties.size(),
+                                        asyncFile, event -> {
+                                        logger.trace("Closing input stream");
+                                        asyncFile.close();
+                                    });
 
                                 resourceHandler.handle(documentContentResource);
-                            }
-                            catch (IOException ioe) {
+                            } catch (IOException ioe) {
                                 resourceHandler.handle(ErrorResource.makeInvalid(ioe.toString()));
                             }
                         });
@@ -207,8 +205,7 @@ public class FileSystemStorage implements Storage {
                             if (fileProperties.isDirectory()) {
                                 /* TODO: meta not yet supported for collections */
                                 resourceHandler.handle(ErrorResource.makeRejected());
-                            }
-                            else if (fileProperties.isRegularFile()) {
+                            } else if (fileProperties.isRegularFile()) {
                                 String mimeType = null;
                                 try {
                                     mimeType = Files.probeContentType(resourcePath);
@@ -216,18 +213,16 @@ public class FileSystemStorage implements Storage {
                                     logger.warn("Could not determine mime type for {}", resourcePath);
                                 }
                                 DocumentDescriptorResource documentDescriptorResource =
-                                        new DocumentDescriptorResource(resourceFileNameString, mimeType,
-                                                fileProperties.creationTime(), fileProperties.lastModifiedTime(),
-                                                fileProperties.lastAccessTime(), fileProperties.size());
+                                    new DocumentDescriptorResource(resourceFileNameString, mimeType,
+                                        fileProperties.creationTime(), fileProperties.lastModifiedTime(),
+                                        fileProperties.lastAccessTime(), fileProperties.size());
 
                                 resourceHandler.handle(documentDescriptorResource);
                             }
                         });
                     }
                 });
-            }
-
-            else {
+            } else {
                 resourceHandler.handle(ErrorResource.makeNotFound());
             }
         });
@@ -273,13 +268,12 @@ public class FileSystemStorage implements Storage {
                     if (parentExists) {
                         fileSystem.mkdirs(pathString, asyncMkdirsResult -> {
                             Resource res = (asyncMkdirsResult.succeeded())
-                                    ? ErrorResource.makeUnit()
-                                    : ErrorResource.makeInvalid(asyncMkdirsResult.cause().toString())
-                                    ;
+                                               ? ErrorResource.makeUnit()
+                                               : ErrorResource.makeInvalid(asyncMkdirsResult.cause().toString());
                             resourceHandler.handle(res);
                         });
                     }
-                 });
+                });
             }
         });
     } /* putCollection() */
@@ -314,8 +308,8 @@ public class FileSystemStorage implements Storage {
 
                     /* ??? */
                     else {
-                        resourceHandler.handle( ErrorResource.makeInvalid(
-                                "Existing resource is neither a collection nor a document."));
+                        resourceHandler.handle(ErrorResource.makeInvalid(
+                            "Existing resource is neither a collection nor a document."));
                     }
                 });
             }
@@ -333,8 +327,8 @@ public class FileSystemStorage implements Storage {
                             resourceHandler.handle(ErrorResource.makeUnit());
                         });
                     } else {
-                        resourceHandler.handle( ErrorResource.makeInvalid(
-                                "Parent collection not existing."));
+                        resourceHandler.handle(ErrorResource.makeInvalid(
+                            "Parent collection not existing."));
                     }
                 });
             }
@@ -354,20 +348,19 @@ public class FileSystemStorage implements Storage {
             if (openAsyncResult.succeeded()) {
 
                 final AsyncFile asyncFile =
-                        openAsyncResult.result();
+                    openAsyncResult.result();
 
                 final DocumentContentResource documentContentResource =
-                        new DocumentContentResource(asyncFile, dummy ->
-                                asyncFile.close(closeAsyncResult ->
-                                        fileSystem.delete(destPathString, deleteAsyncResult ->
-                                                fileSystem.move(tempPathString, destPathString, moveAsyncResult -> {
-                                                    logger.info("Operation completed.");
-                                                    completionHandler.handle(null);
-                                                }))));
+                    new DocumentContentResource(asyncFile, dummy ->
+                                                               asyncFile.close(closeAsyncResult ->
+                                                                                   fileSystem.delete(destPathString, deleteAsyncResult ->
+                                                                                                                         fileSystem.move(tempPathString, destPathString, moveAsyncResult -> {
+                                                                                                                             logger.info("Operation completed.");
+                                                                                                                             completionHandler.handle(null);
+                                                                                                                         }))));
 
                 handler.handle(documentContentResource);
-            }
-            else {
+            } else {
                 handler.handle(ErrorResource.makeInvalid(openAsyncResult.cause().toString()));
             }
         });
@@ -384,13 +377,13 @@ public class FileSystemStorage implements Storage {
         fileSystem.exists(pathString, existsAsyncResult -> {
             final Boolean exists = existsAsyncResult.result();
 
-            if (! exists) {
+            if (!exists) {
                 resourceHandler.handle(ErrorResource.makeNotFound());
             } else {
                 fileSystem.delete(pathString, deleteAsyncResult -> {
                     Resource resource = deleteAsyncResult.succeeded()
-                            ? ErrorResource.makeUnit()
-                            : ErrorResource.makeInvalid(deleteAsyncResult.cause().toString());
+                                            ? ErrorResource.makeUnit()
+                                            : ErrorResource.makeInvalid(deleteAsyncResult.cause().toString());
 
                     resourceHandler.handle(resource);
                 });

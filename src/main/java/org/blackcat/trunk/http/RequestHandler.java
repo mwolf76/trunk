@@ -7,7 +7,6 @@ import io.vertx.core.MultiMap;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpServerRequest;
-import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
@@ -55,6 +54,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
     private TemplateEngine templateEngine;
     private Logger logger;
     private Storage storage;
+    private ResponseBuilder responseBuilder;
 
     public RequestHandler(final Vertx vertx, final TemplateEngine templateEngine,
                           final Logger logger, final Configuration configuration,
@@ -65,6 +65,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
         this.templateEngine = templateEngine;
         this.logger = logger;
         this.storage = storage;
+        this.responseBuilder = new ResponseBuilder(templateEngine, logger);
 
         // We need cookies, sessions and request bodies
         router.route()
@@ -123,17 +124,17 @@ public class RequestHandler implements Handler<HttpServerRequest> {
         /* invalid URL */
         router
                 .getWithRegex(".*")
-                .handler(this::notFound);
+                .handler(responseBuilder::notFound);
 
        /* invalid method */
         router
                 .routeWithRegex(".*")
-                .handler(this::notAllowed);
+                .handler(responseBuilder::notAllowed);
 
         /* errors */
         router
                 .route()
-                .failureHandler(this::internalServerError);
+                .failureHandler(responseBuilder::internalServerError);
     }
 
     private void setupOAuth2(final Vertx vertx, final Router router, final Configuration configuration) {
@@ -191,7 +192,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                     AccessToken token = (AccessToken) User;
 
                     if (token == null) {
-                        found(ctx, "/");
+                        responseBuilder.found(ctx, "/");
                     }
                     else {
                         // Revoke only the access token
@@ -200,7 +201,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                                 logger.info("Revoked tokens");
 
                                 ctx.clearUser();
-                                found(ctx, "/");
+                                responseBuilder.found(ctx, "/");
                             });
                         });
                     }
@@ -233,7 +234,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
         findCreateUserEntityByEmail(email, userMapper -> {
             /* userMapper won't be null */
             String targetURI = userMapper.getUuid() + "/";
-            found(ctx, targetURI);
+            responseBuilder.found(ctx, targetURI);
         });
     }
 
@@ -283,7 +284,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
 
         JsonObject json = ctx.getBodyAsJson();
         if (json == null) {
-            badRequest(ctx, null);
+            responseBuilder.badRequest(ctx);
             return;
         }
 
@@ -320,14 +321,14 @@ public class RequestHandler implements Handler<HttpServerRequest> {
             }, res -> {
                 final List<Path> paths = (List<Path>) res.result();
                 if (paths == null) {
-                    internalServerError(ctx);
+                    responseBuilder.internalServerError(ctx);
                     return;
                 }
 
                 /* first link of the chain */
                 Future<Void> initFuture = Future.future(event -> {
                     logger.info("Started updating share permissions, owner is {}.", userMapper.getEmail());
-                    done(ctx); /* return control to the user, process will continue in background */
+                    responseBuilder.done(ctx); /* return control to the user, process will continue in background */
                 });
                 Future<Void> prevFuture = initFuture;
 
@@ -335,7 +336,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                     Future chainFuture = Future.future();
                     prevFuture.compose(v -> {
                         if (userMapper != null && collectionPath.startsWith(Paths.get(userMapper.getUuid()))) {
-                            findUpdateShareEntity(userMapper, storage.getRoot().relativize(path), newAuthorizedUsers, done -> {
+                            findOrUpdateShareEntity(userMapper, storage.getRoot().relativize(path), newAuthorizedUsers, done -> {
                                 chainFuture.complete();
                             });
                         } else {
@@ -384,7 +385,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                         logger.warn("Not the owner, nor sharing permission exists for user {}. Access denied.",
                                 userMapper.getEmail());
 
-                        forbidden(ctx);
+                        responseBuilder.forbidden(ctx);
                     }
                 });
             }
@@ -405,22 +406,21 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                 protectedPath.toString(), resolvedPath.toString(), etag);
 
         storage.get(resolvedPath, etag, resource -> {
-
             /* Error handling */
             if (resource instanceof ErrorResource) {
                 ErrorResource errorResource = (ErrorResource) resource;
                 if (errorResource.isNotFound()) {
-                    notFound(ctx);
+                    responseBuilder.notFound(ctx);
                     return;
                 } else {
-                    internalServerError(ctx);
+                    responseBuilder.internalServerError(ctx);
                     return;
                 }
             }
 
             /* Cache handling */
             if (! resource.isModified()) {
-                notModified(ctx, etag);
+                responseBuilder.notModified(ctx, etag);
                 return;
             }
 
@@ -437,7 +437,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
 
                 /* URL missing trailing '/'? Redirect to proper URL */
                 if (! trailingSlash) {
-                    found(ctx, ctx.request().path() + "/");
+                    responseBuilder.found(ctx, ctx.request().path() + "/");
                     return;
                 }
 
@@ -475,7 +475,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                                     logger.info("... archive file transfer completed, {} bytes transferred.",
                                             ((PumpImpl) pump).getBytesPumped());
 
-                                    done(ctx);
+                                    responseBuilder.done(ctx);
                                 });
 
                         ctx
@@ -490,7 +490,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                     }
                     catch (IOException ioe) {
                         logger.error(ioe.toString());
-                        internalServerError(ctx);
+                        responseBuilder.internalServerError(ctx);
                     }
                 }
 
@@ -569,7 +569,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                                     .put("modified", documentDescriptorResource.getHumanLastModificationTime())
                                     .put("accessed", documentDescriptorResource.getHumanLastAccessedTime())
                                     .put("length", documentDescriptorResource.getHumanLength()));
-                        } else internalServerError(ctx);
+                        } else responseBuilder.internalServerError(ctx);
                     }
 
                     final String body =
@@ -586,7 +586,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
 
                 /* how exactly am I supposed to talk to you? */
                 // TODO: review this
-                else notAcceptable(ctx);
+                else responseBuilder.notAcceptable(ctx);
             }
 
             else if (resource instanceof DocumentDescriptorResource) {
@@ -619,7 +619,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
 
                 /* extra trailing '/'? Redirect */
                 if (trailingSlash) {
-                    found(ctx, chopString(ctx.request().path()));
+                    responseBuilder.found(ctx, chopString(ctx.request().path()));
                     return;
                 } else {
                     DocumentContentResource documentContentResource =
@@ -650,7 +650,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                                 documentContentResource.getCloseHandler()
                                         .handle(null);
 
-                                done(ctx);
+                                responseBuilder.done(ctx);
                             });
 
                     logger.info("outgoing file transfer started ...");
@@ -676,11 +676,11 @@ public class RequestHandler implements Handler<HttpServerRequest> {
             if (resource instanceof ErrorResource) {
                 ErrorResource errorResource = (ErrorResource) resource;
                 if (errorResource.isUnit()) {
-                    ok(ctx);
+                    responseBuilder.ok(ctx);
                 } else if (errorResource.isInvalid()) {
-                    conflict(ctx, errorResource.getMessage());
+                    responseBuilder.conflict(ctx, errorResource.getMessage());
                 } else {
-                    internalServerError(ctx);
+                    responseBuilder.internalServerError(ctx);
                 }
                 return;
             }
@@ -707,21 +707,21 @@ public class RequestHandler implements Handler<HttpServerRequest> {
             if (resource instanceof ErrorResource) {
                 ErrorResource errorResource = (ErrorResource) resource;
                 if (errorResource.isUnit()) {
-                    ok(ctx);
+                    responseBuilder.ok(ctx);
                 }
                 else if (errorResource.isInvalid()) {
-                    conflict(ctx, errorResource.getMessage());
+                    responseBuilder.conflict(ctx, errorResource.getMessage());
                 } else {
-                    internalServerError(ctx);
+                    responseBuilder.internalServerError(ctx);
                 }
             }
 
             else if (! resource.isModified()) {
-                notModified(ctx, etag);
+                responseBuilder.notModified(ctx, etag);
             }
 
             else if (resource instanceof CollectionResource) {
-                notAcceptable(ctx);
+                responseBuilder.notAcceptable(ctx);
             }
 
             else if (resource instanceof DocumentContentResource) {
@@ -758,22 +758,22 @@ public class RequestHandler implements Handler<HttpServerRequest> {
             if (resource instanceof ErrorResource) {
                 ErrorResource errorResource = (ErrorResource) resource;
                 if (errorResource.isNotFound()) {
-                    notFound(ctx);
+                    responseBuilder.notFound(ctx);
                     return;
                 }
 
                 else if (errorResource.isInvalid()) {
-                    conflict(ctx, errorResource.getMessage());
+                    responseBuilder.conflict(ctx, errorResource.getMessage());
                     return;
                 }
 
                 else if (errorResource.isUnit()) {
-                    ok(ctx);
+                    responseBuilder.ok(ctx);
                     return;
                 }
             }
 
-            internalServerError(ctx);
+            responseBuilder.internalServerError(ctx);
         });
     }
 
@@ -789,12 +789,14 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                 .put("params", new JsonObject()
                         .put("email", email));
 
-        vertx.eventBus().send("data-store", query, reply -> {
-            if (reply.succeeded()) {
-                JsonObject obj = (JsonObject) reply.result().body();
-                UserMapper userMapper = obj.mapTo(UserMapper.class);
-                handler.handle(userMapper);
-            }
+        vertx.eventBus()
+            .send("data-store", query, reply -> {
+                if (reply.failed())
+                    handler.handle(null);
+                else {
+                    JsonObject obj = (JsonObject) reply.result().body();
+                    handler.handle(obj.mapTo(UserMapper.class));
+                }
         });
     }
 
@@ -807,8 +809,8 @@ public class RequestHandler implements Handler<HttpServerRequest> {
      * @param authorizedUsers
      * @param handler
      */
-    private void findUpdateShareEntity(UserMapper owner, Path collectionPath,
-                                       List<String> authorizedUsers, Handler<ShareMapper> handler) {
+    private void findOrUpdateShareEntity(UserMapper owner, Path collectionPath,
+                                         List<String> authorizedUsers, Handler<ShareMapper> handler) {
 
         JsonObject query = new JsonObject()
                 .put("type", QueryType.FIND_UPDATE_SHARE.getTag())
@@ -817,15 +819,17 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                         .put("collectionPath", collectionPath.toString())
                         .put("authorizedUsers", new JsonArray(authorizedUsers)));
 
-        vertx.eventBus().send("data-store", query, reply -> {
-            if (reply.succeeded()) {
-                JsonObject obj = (JsonObject) reply.result().body();
-                ShareMapper shareMapper = obj.mapTo(ShareMapper.class);
-                handler.handle(shareMapper);
-            }
+        vertx.eventBus()
+            .send("data-store", query, reply -> {
+                if (reply.failed())
+                    handler.handle(null);
+                else {
+                    JsonObject obj = (JsonObject) reply.result().body();
+                    handler.handle(obj.mapTo(ShareMapper.class));
+                }
         });
 
-    } /* findUpdateShareEntity() */
+    } /* findOrUpdateShareEntity() */
 
     /**
      * Fetches an existing share entity related to collectionPath or NULL if no such entity exists.
@@ -839,187 +843,16 @@ public class RequestHandler implements Handler<HttpServerRequest> {
                 .put("params", new JsonObject()
                         .put("collectionPath", collectionPath.toString()));
 
-        vertx.eventBus().send("data-store", query, reply -> {
-            if (reply.succeeded()) {
+        vertx.eventBus()
+            .send("data-store", query, reply -> {
+            if (reply.failed())
+                handler.handle(null);
+            else {
                 JsonObject obj = (JsonObject) reply.result().body();
-                ShareMapper shareMapper = obj.mapTo(ShareMapper.class);
-                handler.handle(shareMapper);
+                handler.handle(obj.mapTo(ShareMapper.class));
             }
         });
     } /* findShareEntity() */
-
-    /*** Responders ***************************************************************************************************/
-    private void badRequest(RoutingContext ctx, String message) {
-        HttpServerRequest request = ctx.request();
-        logger.debug("Bad Request: {}", request.uri());
-
-        request.response()
-                .setStatusCode(StatusCode.BAD_REQUEST.getStatusCode())
-                .setStatusMessage(StatusCode.BAD_REQUEST.getStatusMessage())
-                .end(message != null ? message : StatusCode.BAD_REQUEST.getStatusMessage());
-    }
-
-    private void conflict(RoutingContext ctx, String message) {
-        HttpServerRequest request = ctx.request();
-        logger.debug("Conflict: {}", message);
-
-        request.response()
-                .setStatusCode(StatusCode.CONFLICT.getStatusCode())
-                .setStatusMessage(StatusCode.CONFLICT.getStatusMessage())
-                .end(message);
-    }
-
-    private void done(RoutingContext ctx) {
-        ctx.response()
-                .end();
-    }
-
-    private void notAllowed(RoutingContext ctx) {
-        HttpServerRequest request = ctx.request();
-        logger.debug("Not allowed: {}", request.uri());
-
-        request.response()
-                .setStatusCode(StatusCode.METHOD_NOT_ALLOWED.getStatusCode())
-                .setStatusMessage(StatusCode.METHOD_NOT_ALLOWED.getStatusMessage())
-                .end(StatusCode.METHOD_NOT_ALLOWED.toString());
-    }
-
-    private void notAcceptable(RoutingContext ctx) {
-        HttpServerRequest request = ctx.request();
-        logger.debug("Not acceptable: {}", request.uri());
-
-        request.response()
-                .setStatusCode(StatusCode.NOT_ACCEPTABLE.getStatusCode())
-                .setStatusMessage(StatusCode.NOT_ACCEPTABLE.getStatusMessage())
-                .end(StatusCode.NOT_ACCEPTABLE.toString());
-    }
-
-    private void notFound(RoutingContext ctx) {
-        HttpServerRequest request = ctx.request();
-        final MultiMap headers = request.headers();
-        String accept = headers.get(Headers.ACCEPT_HEADER);
-        boolean html = (accept != null && accept.contains("text/html"));
-        boolean json = (accept != null && accept.contains("application/json"));
-
-        logger.debug("Resource not found: {}", request.uri());
-        HttpServerResponse response = ctx.response();
-        response
-                .setStatusCode(StatusCode.NOT_FOUND.getStatusCode())
-                .setStatusMessage(StatusCode.NOT_FOUND.getStatusMessage());
-
-        if (html) {
-            templateEngine.render(ctx, "templates/notfound", asyncResult -> {
-                if (asyncResult.succeeded()) {
-                    response
-                            .putHeader(Headers.CONTENT_TYPE_HEADER, "text/html; charset=utf-8")
-                            .end(asyncResult.result());
-                }
-            });
-        } else if (json) {
-            response
-                    .end(new JsonObject()
-                            .put("status", "error")
-                            .put("message", "Not Found")
-                            .encodePrettily());
-        } else /* assume: text/plain */ {
-            response
-                    .end(StatusCode.NOT_FOUND.toString());
-        }
-    }
-
-    private void forbidden(RoutingContext ctx) {
-        HttpServerRequest request = ctx.request();
-        final MultiMap headers = request.headers();
-        String accept = headers.get(Headers.ACCEPT_HEADER);
-        boolean html = (accept != null && accept.contains("text/html"));
-        boolean json = (accept != null && accept.contains("application/json"));
-
-        logger.debug("Resource not found: {}", request.uri());
-        HttpServerResponse response = ctx.response();
-        response
-                .setStatusCode(StatusCode.FORBIDDEN.getStatusCode())
-                .setStatusMessage(StatusCode.FORBIDDEN.getStatusMessage());
-
-        if (html) {
-            templateEngine.render(ctx, "templates/forbidden", asyncResult -> {
-                if (asyncResult.succeeded()) {
-                    response
-                            .putHeader(Headers.CONTENT_TYPE_HEADER, "text/html; charset=utf-8")
-                            .end(asyncResult.result());
-                }
-            });
-        } else if (json) {
-            response
-                    .end(new JsonObject()
-                            .put("status", "error")
-                            .put("message", "Not Found")
-                            .encodePrettily());
-        } else /* assume: text/plain */ {
-            response
-                    .end(StatusCode.NOT_FOUND.toString());
-        }
-    }
-
-    private void notModified(RoutingContext ctx, String etag) {
-        ctx.response()
-                .setStatusCode(StatusCode.NOT_MODIFIED.getStatusCode())
-                .setStatusMessage(StatusCode.NOT_MODIFIED.getStatusMessage())
-                .putHeader(Headers.ETAG_HEADER, etag)
-                .putHeader(Headers.CONTENT_LENGTH_HEADER, "0")
-                .end();
-    }
-
-    private void ok(RoutingContext ctx) {
-        HttpServerRequest request = ctx.request();
-        logger.debug("Ok: {}", request.uri());
-
-        ctx.response()
-                .setStatusCode(StatusCode.OK.getStatusCode())
-                .setStatusMessage(StatusCode.OK.getStatusMessage())
-                .end(StatusCode.OK.toString());
-    }
-
-    private void internalServerError(RoutingContext ctx) {
-        HttpServerRequest request = ctx.request();
-        final MultiMap headers = request.headers();
-        String accept = headers.get(Headers.ACCEPT_HEADER);
-        boolean html = (accept != null && accept.contains("text/html"));
-        boolean json = (accept != null && accept.contains("application/json"));
-
-        logger.debug("Resource not found: {}", request.uri());
-        HttpServerResponse response = ctx.response();
-        response
-                .setStatusCode(StatusCode.INTERNAL_SERVER_ERROR.getStatusCode())
-                .setStatusMessage(StatusCode.INTERNAL_SERVER_ERROR.getStatusMessage());
-
-        if (html) {
-            templateEngine.render(ctx, "templates/internal", asyncResult -> {
-                if (asyncResult.succeeded()) {
-                    response
-                            .putHeader(Headers.CONTENT_TYPE_HEADER, "text/html; charset=utf-8")
-                            .end(asyncResult.result());
-                }
-            });
-        } else if (json) {
-            response
-                    .end(new JsonObject()
-                            .put("status", "error")
-                            .put("message", "Not Found")
-                            .encodePrettily());
-        } else /* assume: text/plain */ {
-            response
-                    .end(StatusCode.INTERNAL_SERVER_ERROR.toString());
-        }
-    }
-
-    private void found(RoutingContext ctx, String targetURI) {
-        logger.debug("Redirecting to {}", targetURI);
-        ctx.response()
-                .putHeader(Headers.LOCATION_HEADER, targetURI)
-                .setStatusCode(StatusCode.FOUND.getStatusCode())
-                .setStatusMessage(StatusCode.FOUND.getStatusMessage())
-                .end();
-    }
 
     /*** Helpers ******************************************************************************************************/
     private static String getSessionUserEmail(RoutingContext ctx) {

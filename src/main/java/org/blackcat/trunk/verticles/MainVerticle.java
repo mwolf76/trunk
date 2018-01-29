@@ -22,7 +22,7 @@ public class MainVerticle extends AbstractVerticle {
 
         List<AbstractVerticle> verticles = Arrays.asList(
                 new DataStoreVerticle(),
-                new AppVerticle());
+                new WebServerVerticle());
 
         AtomicInteger verticleCount = new AtomicInteger(verticles.size());
 
@@ -34,15 +34,17 @@ public class MainVerticle extends AbstractVerticle {
                 .forEach(verticle -> {
                     vertx.deployVerticle(verticle, new DeploymentOptions()
                             .setConfig(config), deployResponse -> {
+                        String simpleName = verticle.getClass().getSimpleName();
                         if (deployResponse.failed()) {
                             deployResponse.cause().printStackTrace();
                             logger.error("Unable to deploy verticle {} (cause: {})",
-                                    verticle.getClass().getSimpleName(),
+                                simpleName,
                                     deployResponse.cause());
                         } else {
-                            logger.info("{} deployed successfully", verticle.getClass().getSimpleName());
+                            logger.info("{} deployed successfully", simpleName);
 
                             if (verticleCount.decrementAndGet() == 0) {
+                                logger.info("All verticles deployed and running. Ready to serve requests.");
                                 startFuture.complete();
                             }
                         }
@@ -50,9 +52,9 @@ public class MainVerticle extends AbstractVerticle {
                 });
 
         Configuration configuration = new Configuration(config);
-        logger.info("Configuration: {}", configuration.toString());
+        logger.info(configuration);
 
-        int timeout = configuration.getTimeout();
+        int timeout = configuration.getStartTimeout();
         vertx.setTimer(TimeUnit.SECONDS.toMillis(timeout), event -> {
             if (verticleCount.get() != 0) {
                 logger.error("One or more verticles could not be deployed within {} seconds. Aborting ...", timeout);

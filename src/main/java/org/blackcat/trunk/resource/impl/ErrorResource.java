@@ -1,5 +1,9 @@
 package org.blackcat.trunk.resource.impl;
 
+import io.vertx.ext.web.RoutingContext;
+import org.blackcat.trunk.http.ErrorResourceHandler;
+import org.blackcat.trunk.http.ResponseBuilder;
+
 final public class ErrorResource extends BaseResource {
 
     private boolean notFound = false;

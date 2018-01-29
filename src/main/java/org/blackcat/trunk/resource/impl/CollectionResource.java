@@ -1,5 +1,9 @@
 package org.blackcat.trunk.resource.impl;
 
+import io.vertx.ext.web.RoutingContext;
+import org.blackcat.trunk.http.CollectionResourceHandler;
+import org.blackcat.trunk.http.RequestHandler;
+import org.blackcat.trunk.http.ResponseBuilder;
 import org.blackcat.trunk.resource.Resource;
 import org.blackcat.trunk.resource.impl.BaseResource;
 
