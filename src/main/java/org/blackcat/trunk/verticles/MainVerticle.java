@@ -25,8 +25,6 @@ public class MainVerticle extends AbstractVerticle {
                 new WebServerVerticle());
 
         AtomicInteger verticleCount = new AtomicInteger(verticles.size());
-
-        /* retrieve configuration object from vert.x ctx */
         JsonObject config = vertx.getOrCreateContext().config();
 
         verticles

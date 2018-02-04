@@ -94,6 +94,11 @@ final public class Utils {
         return prefix.relativize(Paths.get(urlDecode(request.path())));
     }
 
+    public static Path protectedPath(RoutingContext ctx) {
+        Path prefix = Paths.get("/protected");
+        return prefix.relativize(Paths.get(urlDecode(ctx.request().path())));
+    }
+
     public static boolean requestURLasTrailingSlash(HttpServerRequest request) {
         return urlDecode(request.path()).endsWith("/");
     }

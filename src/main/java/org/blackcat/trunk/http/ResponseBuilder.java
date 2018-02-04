@@ -19,7 +19,7 @@ public class ResponseBuilder {
         this.logger = logger;
     }
 
-    /* 200 */ void ok(RoutingContext ctx) {
+    /* 200 */ public void ok(RoutingContext ctx) {
         HttpServerRequest request = ctx.request();
         logger.debug("Ok: {}", request.uri());
 
@@ -29,12 +29,12 @@ public class ResponseBuilder {
             .end(StatusCode.OK.toString());
     }
 
-    /* 200 */ void done(RoutingContext ctx) {
+    /* 200 */ public void done(RoutingContext ctx) {
         ctx.response()
             .end();
     }
 
-    /* 302 */ void found(RoutingContext ctx, String targetURI) {
+    /* 302 */ public void found(RoutingContext ctx, String targetURI) {
         logger.debug("Redirecting to {}", targetURI);
         ctx.response()
             .putHeader(Headers.LOCATION_HEADER, targetURI)
@@ -43,7 +43,7 @@ public class ResponseBuilder {
             .end();
     }
 
-    /* 304 */ void notModified(RoutingContext ctx, String etag) {
+    /* 304 */ public void notModified(RoutingContext ctx, String etag) {
         ctx.response()
             .setStatusCode(StatusCode.NOT_MODIFIED.getStatusCode())
             .setStatusMessage(StatusCode.NOT_MODIFIED.getStatusMessage())
@@ -52,7 +52,17 @@ public class ResponseBuilder {
             .end();
     }
 
-    /* 401 */ void forbidden(RoutingContext ctx) {
+    /* 400 */ public void badRequest(RoutingContext ctx) {
+        HttpServerRequest request = ctx.request();
+        logger.debug("Bad Request: {}", request.uri());
+
+        request.response()
+            .setStatusCode(StatusCode.BAD_REQUEST.getStatusCode())
+            .setStatusMessage(StatusCode.BAD_REQUEST.getStatusMessage())
+            .end();
+    }
+
+    /* 401 */ public void forbidden(RoutingContext ctx) {
         HttpServerRequest request = ctx.request();
         final MultiMap headers = request.headers();
         String accept = headers.get(Headers.ACCEPT_HEADER);
@@ -85,17 +95,7 @@ public class ResponseBuilder {
         }
     }
 
-    /* 400 */ void badRequest(RoutingContext ctx) {
-        HttpServerRequest request = ctx.request();
-        logger.debug("Bad Request: {}", request.uri());
-
-        request.response()
-            .setStatusCode(StatusCode.BAD_REQUEST.getStatusCode())
-            .setStatusMessage(StatusCode.BAD_REQUEST.getStatusMessage())
-            .end();
-    }
-
-    /* 404 */ void notFound(RoutingContext ctx) {
+    /* 404 */ public void notFound(RoutingContext ctx) {
         HttpServerRequest request = ctx.request();
         MultiMap headers = request.headers();
 
@@ -103,7 +103,6 @@ public class ResponseBuilder {
         boolean html = (accept != null && accept.contains("text/html"));
         boolean json = (accept != null && accept.contains("application/json"));
 
-        logger.debug("Resource not found: {}", request.uri());
         HttpServerResponse response = ctx.response();
         response
             .setStatusCode(StatusCode.NOT_FOUND.getStatusCode())
@@ -129,7 +128,7 @@ public class ResponseBuilder {
         }
     }
 
-    /* 405 */ void notAllowed(RoutingContext ctx) {
+    /* 405 */ public void notAllowed(RoutingContext ctx) {
         HttpServerRequest request = ctx.request();
         logger.debug("Not allowed: {}", request.uri());
 
@@ -139,7 +138,7 @@ public class ResponseBuilder {
             .end(StatusCode.METHOD_NOT_ALLOWED.toString());
     }
 
-    /* 409 */ void conflict(RoutingContext ctx, String message) {
+    /* 409 */ public void conflict(RoutingContext ctx, String message) {
         HttpServerRequest request = ctx.request();
         logger.debug("Conflict: {}", message);
 
@@ -149,7 +148,7 @@ public class ResponseBuilder {
             .end(message);
     }
 
-    /* 406 */ void notAcceptable(RoutingContext ctx) {
+    /* 406 */ public void notAcceptable(RoutingContext ctx) {
         HttpServerRequest request = ctx.request();
         logger.debug("Not acceptable: {}", request.uri());
 
@@ -159,14 +158,16 @@ public class ResponseBuilder {
             .end(StatusCode.NOT_ACCEPTABLE.toString());
     }
 
-    /* 500 */ void internalServerError(RoutingContext ctx) {
+    /* 500 */ public void internalServerError(RoutingContext ctx) {
         HttpServerRequest request = ctx.request();
+        logger.error("Internal error for request {}: {}",
+            request.uri(), ctx.failure().getMessage());
+
         final MultiMap headers = request.headers();
         String accept = headers.get(Headers.ACCEPT_HEADER);
         boolean html = (accept != null && accept.contains("text/html"));
         boolean json = (accept != null && accept.contains("application/json"));
 
-        logger.debug("Resource not found: {}", request.uri());
         HttpServerResponse response = ctx.response();
         response
             .setStatusCode(StatusCode.INTERNAL_SERVER_ERROR.getStatusCode())
@@ -191,7 +192,6 @@ public class ResponseBuilder {
                 .end(StatusCode.INTERNAL_SERVER_ERROR.toString());
         }
     }
-
 
     void htmlResponse(RoutingContext ctx, Buffer result) {
         ctx.response()

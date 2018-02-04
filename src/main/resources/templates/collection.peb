@@ -296,4 +296,4 @@
 {% endblock %}
 
 {% block logout %}
-<div id="logout"><a href="/logout/"><span class="glyphicon glyphicon-log-out"></span></a>{% endblock %}</div>
+<div id="logout"><a href="/protected/logout/"><span class="glyphicon glyphicon-log-out"></span></a>{% endblock %}</div>

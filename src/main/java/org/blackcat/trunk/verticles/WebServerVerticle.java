@@ -24,25 +24,18 @@ import java.nio.file.Paths;
 
 public class WebServerVerticle extends AbstractVerticle {
 
-    private Logger logger;
+    private Logger logger = LoggerFactory.getLogger(WebServerVerticle.class);
 
     @Override
     public void start(Future<Void> startFuture) {
-        initLogger();
-
-        /* retrieve configuration object from vert.x ctx */
-        Configuration configuration = new Configuration(vertx.getOrCreateContext().config());
-
-        /* configure Pebble template engine */
-        PebbleTemplateEngine pebbleEngine = PebbleTemplateEngine.create(vertx);
+        /* retrieve configuration object from vertx ctx */
+        Configuration configuration = Configuration.create(vertx.getOrCreateContext().config());
 
         /* configure disk storage */
-        Storage storage = new FileSystemStorage(vertx, logger,
-            Paths.get(configuration.getStorageRoot()));
+        Storage storage = FileSystemStorage.create(vertx, Paths.get(configuration.getStorageRoot()));
 
         /* configure request handler */
-        Handler<HttpServerRequest> handler =
-            new RequestHandler(vertx, pebbleEngine, logger, configuration, storage);
+        Handler<HttpServerRequest> handler = RequestHandler.create(vertx, configuration, storage);
 
         HttpServerOptions httpServerOptions =
             new HttpServerOptions()
@@ -70,9 +63,5 @@ public class WebServerVerticle extends AbstractVerticle {
                     startFuture.complete();
                 }
             });
-    }
-
-    private void initLogger() {
-        logger =  LoggerFactory.getLogger(WebServerVerticle.class);
     }
 }

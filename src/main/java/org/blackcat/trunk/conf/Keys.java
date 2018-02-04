@@ -2,51 +2,62 @@ package org.blackcat.trunk.conf;
 
 final public class Keys {
     /* SERVER */
-    static final String SERVER_SECTION = "server";
+    public static final String SERVER_SECTION = "server";
 
-    static final String SERVER_HTTP_PORT = "port";
-    static final int DEFAULT_SERVER_HTTP_PORT = 8080;
+    public static final String SERVER_HTTP_HOST = "host";
+    public static final String DEFAULT_SERVER_HTTP_HOST = "localhost";
 
-    static final String SERVER_USE_SSL = "useSSL";
-    static final boolean DEFAULT_SERVER_USE_SSL = false;
+    public static final String SERVER_HTTP_PORT = "port";
+    public static final int DEFAULT_SERVER_HTTP_PORT = 8080;
 
-    static final String SERVER_KEYSTORE_FILENAME = "keystoreFilename";
-    static final String DEFAULT_SERVER_KEYSTORE_FILENAME = "server-keystore.jks";
+    public static final String SERVER_USE_SSL = "useSSL";
+    public static final boolean DEFAULT_SERVER_USE_SSL = false;
 
-    static final String SERVER_KEYSTORE_PASSWORD = "keystorePassword";
-    static final String DEFAULT_SERVER_KEYSTORE_PASSWORD = "password";
+    public static final String SERVER_KEYSTORE_FILENAME = "keystoreFilename";
+    public static final String DEFAULT_SERVER_KEYSTORE_FILENAME = "server-keystore.jks";
 
-    static final String SERVER_START_TIMEOUT = "timeout";
-    static final int DEFAULT_SERVER_START_TIMEOUT = 30;
+    public static final String SERVER_KEYSTORE_PASSWORD = "keystorePassword";
+    public static final String DEFAULT_SERVER_KEYSTORE_PASSWORD = "password";
+
+    public static final String SERVER_START_TIMEOUT = "timeout";
+    public static final int DEFAULT_SERVER_START_TIMEOUT = 30;
 
     /* STORAGE */
-    static final String STORAGE_SECTION = "storage";
-    static final String STORAGE_ROOT = "root";
+    public static final String STORAGE_SECTION = "storage";
+    public static final String STORAGE_ROOT = "root";
 
     /* DATABASE */
-    static final String DATABASE_SECTION = "database";
+    public static final String DATABASE_SECTION = "database";
 
-    static final String DATABASE_TYPE = "type";
-    static final String DATABASE_TYPE_MONGODB = "mongodb";
+    public static final String DATABASE_TYPE = "type";
+    public static final String DATABASE_TYPE_MONGODB = "mongodb";
 
-    static final String DATABASE_HOST = "host";
-    static final String DEFAULT_DATABASE_HOST = "localhost";
+    public static final String DATABASE_HOST = "host";
+    public static final String DEFAULT_DATABASE_HOST = "localhost";
 
-    static final String DATABASE_PORT = "port";
-    static final int DEFAULT_DATABASE_PORT = 27027;
+    public static final String DATABASE_PORT = "port";
+    public static final int DEFAULT_DATABASE_PORT = 27027;
 
-    static final String DATABASE_NAME = "name";
-    static final String DEFAULT_DATABASE_NAME = "data";
+    public static final String DATABASE_NAME = "name";
+    public static final String DEFAULT_DATABASE_NAME = "data";
 
     /* OAUTH2 */
-    static final String OAUTH2_SECTION = "oauth2";
+    public static final String OAUTH2_SECTION = "oauth2";
 
-    static final String OAUTH2_ENABLED = "enabled";
-    static final String OAUTH2_PROVIDER = "provider";
-    static final String OAUTH2_PROVIDER_GOOGLE = "google"; // // TODO: 1/25/18 add more providers
-    static final String OAUTH2_CLIENT_ID = "clientID";
-    static final String OAUTH2_CLIENT_SECRET = "clientSecret";
-    static final String OAUTH2_DOMAIN = "domain";
+    public static final String OAUTH2_PROVIDER = "provider";
+    public static final String OAUTH2_PROVIDER_GOOGLE = "google";
+    public static final String OAUTH2_PROVIDER_KEYCLOAK = "keycloak";
+    public static final String OAUTH2_CLIENT_ID = "clientID";
+    public static final String OAUTH2_CLIENT_SECRET = "clientSecret";
+
+    public static final String OAUTH2_AUTH_SERVER_URL = "authServerURL";
+    public static final String DEFAULT_OAUTH2_AUTH_SERVER_URL = "http://localhost:9000";
+
+    public static final String OAUTH2_AUTH_SERVER_REALM = "authServerRealm";
+    public static final String DEFAULT_OAUTH2_AUTH_SERVER_REALM = "master";
+
+    public static final String OAUTH2_AUTH_SERVER_PUBLIC_KEY = "authServerPublicKey";
+    public static final String DEFAULT_OAUTH2_AUTH_SERVER_PUBLIC_KEY = null;
 
     private Keys()
     {}

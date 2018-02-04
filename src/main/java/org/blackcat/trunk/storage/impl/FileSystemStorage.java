@@ -1,9 +1,11 @@
 package org.blackcat.trunk.storage.impl;
 
+import io.vertx.core.AsyncResult;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.file.*;
 import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
 import org.blackcat.trunk.mappers.UserMapper;
 import org.blackcat.trunk.resource.Resource;
 import org.blackcat.trunk.resource.impl.CollectionResource;
@@ -23,15 +25,14 @@ import java.util.stream.Stream;
 
 public class FileSystemStorage implements Storage {
 
+    private Logger logger = LoggerFactory.getLogger(FileSystemStorage.class);
     static private final OpenOptions openOptions = new OpenOptions();
 
     private Vertx vertx;
-    private Logger logger;
     private Path root;
 
-    public FileSystemStorage(Vertx vertx, Logger logger, Path root) {
+    public FileSystemStorage(Vertx vertx, Path root) {
         this.vertx = vertx;
-        this.logger = logger;
         this.root = root;
     }
 
@@ -99,134 +100,142 @@ public class FileSystemStorage implements Storage {
         /* if resource exists ... */
         String pathString = path.toString();
         fileSystem.exists(pathString, existsAsyncResult -> {
-            Boolean exists = existsAsyncResult.result();
-
-            if (exists) {
+            if (existsAsyncResult.result()) {
                 fileSystem.props(pathString, filePropsAsyncResult -> {
-                    FileProps fileProperties = filePropsAsyncResult.result();
-
-                    /* Directory? */
-                    if (fileProperties.isDirectory()) {
-                        fileSystem.readDir(pathString, dirAsyncResult -> {
-
-                            vertx.executeBlocking(future -> {
-
-                                CollectionResource collectionResource =
-                                    new CollectionResource();
-
-                                for (String entry : dirAsyncResult.result()) {
-                                    Path entryPath = Paths.get(entry);
-                                    String entryPathString = entryPath.toString();
-
-                                    Path entryName = path.relativize(entryPath);
-                                    String entryNameString = entryName.toString();
-
-                                    /* ignore hidden files */
-                                    if (entryNameString.startsWith("."))
-                                        continue;
-
-                                    FileProps fileProps = fileSystem.propsBlocking(entry);
-                                    if (fileProps.isDirectory()) {
-                                        try {
-                                            List<String> nestedEntries = fileSystem.readDirBlocking(entryPathString);
-                                            collectionResource.addItem(
-                                                new CollectionResource(
-                                                    entryNameString, nestedEntries.size()));
-                                        } catch (RuntimeException re) {
-                                            logger.warn("Skipping unreadable directory: {0}", entryPath);
-                                        }
-                                    } else if (fileProps.isRegularFile()) {
-                                        String mimeType = null;
-
-                                        try {
-                                            mimeType = Files.probeContentType(entryPath);
-                                        } catch (IOException e) {
-                                            logger.warn("Could not determine mime type for {}", entryPath);
-                                        }
-                                        collectionResource.addItem(
-                                            new DocumentDescriptorResource(entryNameString, mimeType,
-                                                fileProps.creationTime(), fileProps.lastModifiedTime(),
-                                                fileProps.lastAccessTime(), fileProps.size()));
-                                    } else {
-                                        logger.warn("Unexpected filesystem object: {0}", entryName);
-                                    }
-                                }
-
-                                future.complete(collectionResource);
-                            }, done -> {
-                                final CollectionResource collectionResource = (CollectionResource) done.result();
-                                resourceHandler.handle(collectionResource);
-                            });
-                        });
-                    }
-
-                    /* Regular file? */
-                    else if (fileProperties.isRegularFile()) {
-                        fileSystem.open(pathString, openOptions, openAsyncResult -> {
-                            AsyncFile asyncFile = openAsyncResult.result();
-                            try {
-                                String mimeType = Files.probeContentType(path);
-                                DocumentContentResource documentContentResource =
-                                    new DocumentContentResource(mimeType, fileProperties.size(),
-                                        asyncFile, event -> {
-                                        logger.trace("Closing input stream");
-                                        asyncFile.close();
-                                    });
-
-                                resourceHandler.handle(documentContentResource);
-                            } catch (IOException ioe) {
-                                resourceHandler.handle(ErrorResource.makeInvalid(ioe.toString()));
-                            }
-                        });
-                    }
-
-                    /* Invalid resource */
-                    else {
-                        resourceHandler.handle(ErrorResource.makeInvalid("Unsupported resource type"));
-                    }
+                    normalResource(path, resourceHandler,
+                        fileSystem, pathString, filePropsAsyncResult);
                 });
             }
 
             /* Not found. Is it a `/meta` GET request? */
             else if (path.endsWith("meta")) {
-                Path resourcePath = path.getParent();
-                String resourcePathString = resourcePath.toString();
-
-                Path resourceFileName = resourcePath.getFileName();
-                String resourceFileNameString = resourceFileName.toString();
-
-                /* if resource exists ... */
-                fileSystem.exists(resourcePathString, actualExistsAsyncResult -> {
-                    Boolean actualExists = actualExistsAsyncResult.result();
-                    if (actualExists) {
-                        fileSystem.props(resourcePathString, filePropsAsyncResult -> {
-                            FileProps fileProperties = filePropsAsyncResult.result();
-
-                            if (fileProperties.isDirectory()) {
-                                /* TODO: meta not yet supported for collections */
-                                resourceHandler.handle(ErrorResource.makeRejected());
-                            } else if (fileProperties.isRegularFile()) {
-                                String mimeType = null;
-                                try {
-                                    mimeType = Files.probeContentType(resourcePath);
-                                } catch (IOException e) {
-                                    logger.warn("Could not determine mime type for {}", resourcePath);
-                                }
-                                DocumentDescriptorResource documentDescriptorResource =
-                                    new DocumentDescriptorResource(resourceFileNameString, mimeType,
-                                        fileProperties.creationTime(), fileProperties.lastModifiedTime(),
-                                        fileProperties.lastAccessTime(), fileProperties.size());
-
-                                resourceHandler.handle(documentDescriptorResource);
-                            }
-                        });
-                    }
-                });
+                metaResource(path, resourceHandler, fileSystem);
             } else {
                 resourceHandler.handle(ErrorResource.makeNotFound());
             }
         });
     } /* get() */
+
+    private void normalResource(Path path, Handler<Resource> resourceHandler, FileSystem fileSystem,
+                                String pathString, AsyncResult<FileProps> filePropsAsyncResult) {
+        FileProps fileProperties = filePropsAsyncResult.result();
+
+        /* Directory? */
+        if (fileProperties.isDirectory()) {
+            fileSystem.readDir(pathString, dirAsyncResult -> {
+
+                vertx.executeBlocking(future -> {
+
+                    CollectionResource collectionResource =
+                        new CollectionResource();
+
+                    for (String entry : dirAsyncResult.result()) {
+                        Path entryPath = Paths.get(entry);
+                        String entryPathString = entryPath.toString();
+
+                        Path entryName = path.relativize(entryPath);
+                        String entryNameString = entryName.toString();
+
+                        /* ignore hidden files */
+                        if (entryNameString.startsWith("."))
+                            continue;
+
+                        FileProps fileProps = fileSystem.propsBlocking(entry);
+                        if (fileProps.isDirectory()) {
+                            try {
+                                List<String> nestedEntries = fileSystem.readDirBlocking(entryPathString);
+                                collectionResource.addItem(
+                                    new CollectionResource(
+                                        entryNameString, nestedEntries.size()));
+                            } catch (RuntimeException re) {
+                                logger.warn("Skipping unreadable directory: {0}", entryPath);
+                            }
+                        } else if (fileProps.isRegularFile()) {
+                            String mimeType = null;
+
+                            try {
+                                mimeType = Files.probeContentType(entryPath);
+                            } catch (IOException e) {
+                                logger.warn("Could not determine mime type for {}", entryPath);
+                            }
+                            collectionResource.addItem(
+                                new DocumentDescriptorResource(entryNameString, mimeType,
+                                    fileProps.creationTime(), fileProps.lastModifiedTime(),
+                                    fileProps.lastAccessTime(), fileProps.size()));
+                        } else {
+                            logger.warn("Unexpected filesystem object: {0}", entryName);
+                        }
+                    }
+
+                    future.complete(collectionResource);
+                }, done -> {
+                    final CollectionResource collectionResource = (CollectionResource) done.result();
+                    resourceHandler.handle(collectionResource);
+                });
+            });
+        }
+
+        /* Regular file? */
+        else if (fileProperties.isRegularFile()) {
+            fileSystem.open(pathString, openOptions, openAsyncResult -> {
+                AsyncFile asyncFile = openAsyncResult.result();
+                try {
+                    String mimeType = Files.probeContentType(path);
+                    DocumentContentResource documentContentResource =
+                        new DocumentContentResource(mimeType, fileProperties.size(),
+                            asyncFile, event -> {
+                            logger.trace("Closing input stream");
+                            asyncFile.close();
+                        });
+
+                    resourceHandler.handle(documentContentResource);
+                } catch (IOException ioe) {
+                    resourceHandler.handle(ErrorResource.makeInvalid(ioe.toString()));
+                }
+            });
+        }
+
+        /* Invalid resource */
+        else {
+            resourceHandler.handle(ErrorResource.makeInvalid("Unsupported resource type"));
+        }
+    }
+
+    private void metaResource(Path path, Handler<Resource> resourceHandler, FileSystem fileSystem) {
+        Path resourcePath = path.getParent();
+        String resourcePathString = resourcePath.toString();
+
+        Path resourceFileName = resourcePath.getFileName();
+        String resourceFileNameString = resourceFileName.toString();
+
+        /* if resource exists ... */
+        fileSystem.exists(resourcePathString, actualExistsAsyncResult -> {
+            Boolean actualExists = actualExistsAsyncResult.result();
+            if (actualExists) {
+                fileSystem.props(resourcePathString, filePropsAsyncResult -> {
+                    FileProps fileProperties = filePropsAsyncResult.result();
+
+                    if (fileProperties.isDirectory()) {
+                        /* TODO: meta not yet supported for collections */
+                        resourceHandler.handle(ErrorResource.makeRejected());
+                    } else if (fileProperties.isRegularFile()) {
+                        String mimeType = null;
+                        try {
+                            mimeType = Files.probeContentType(resourcePath);
+                        } catch (IOException e) {
+                            logger.warn("Could not determine mime type for {}", resourcePath);
+                        }
+                        DocumentDescriptorResource documentDescriptorResource =
+                            new DocumentDescriptorResource(resourceFileNameString, mimeType,
+                                fileProperties.creationTime(), fileProperties.lastModifiedTime(),
+                                fileProperties.lastAccessTime(), fileProperties.size());
+
+                        resourceHandler.handle(documentDescriptorResource);
+                    }
+                });
+            }
+        });
+    }
 
     @Override
     public void putCollection(Path path, String etag, Handler<Resource> resourceHandler) {
@@ -390,4 +399,8 @@ public class FileSystemStorage implements Storage {
             }
         });
     } /* delete() */
+
+    public static FileSystemStorage create(Vertx vertx, Path path) {
+        return new FileSystemStorage(vertx, path);
+    }
 }

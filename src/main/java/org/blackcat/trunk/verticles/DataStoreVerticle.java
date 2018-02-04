@@ -51,7 +51,6 @@ final public class DataStoreVerticle extends AbstractVerticle {
         mongoClient.getCollections(ar -> {
             if (ar.succeeded()) {
                 List<String> result = ar.result();
-                result.stream().forEach(System.out::println);
                 setupMessageHandlers();
                 startFuture.complete();
             }

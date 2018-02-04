@@ -12,7 +12,8 @@ import static org.blackcat.trunk.conf.Keys.*;
  */
 final public class Configuration {
 
-    /* Configuration data */
+    /* http section */
+    private String httpHost;
     private int httpPort;
     private boolean useSSL;
     private String keystoreFilename;
@@ -26,14 +27,25 @@ final public class Configuration {
     private String dbName;
 
     /* oauth2 section */
-    private boolean oauth2Enabled;
     private String oauth2Provider;
     private String oauth2ClientID;
     private String oauth2ClientSecret;
-    private String oauth2Domain;
+
+    /* keycloak only */
+    private String oauth2AuthServerURL;
+    private String oauth2AuthServerRealm;
+    private String oauth2AuthServerPublicKey;
 
     /* storage section */
     private String storageRoot;
+
+    public String getHttpHost() {
+        return httpHost;
+    }
+
+    public void setBaseURL(String httpHost) {
+        this.httpHost = httpHost;
+    }
 
     public int getHttpPort() {
         return httpPort;
@@ -41,10 +53,6 @@ final public class Configuration {
 
     public boolean isSSLEnabled() {
         return useSSL;
-    }
-
-    public boolean isOauth2Enabled() {
-        return oauth2Enabled;
     }
 
     public String getKeystoreFilename() {
@@ -62,6 +70,7 @@ final public class Configuration {
     void parseServerSection(JsonObject jsonObject) {
         final JsonObject serverSection = jsonObject.getJsonObject(SERVER_SECTION, new JsonObject());
 
+        this.httpHost = serverSection.getString(SERVER_HTTP_HOST, DEFAULT_SERVER_HTTP_HOST);
         this.httpPort = serverSection.getInteger(SERVER_HTTP_PORT, DEFAULT_SERVER_HTTP_PORT);
         this.useSSL = serverSection.getBoolean(SERVER_USE_SSL, DEFAULT_SERVER_USE_SSL);
         if (useSSL) {
@@ -83,8 +92,16 @@ final public class Configuration {
         return oauth2ClientSecret;
     }
 
-    public String getOAuth2Domain() {
-        return oauth2Domain;
+    public String getOauth2AuthServerURL() {
+        return oauth2AuthServerURL;
+    }
+
+    public String getOauth2AuthServerRealm() {
+        return oauth2AuthServerRealm;
+    }
+
+    public String getOauth2AuthServerPublicKey() {
+        return oauth2AuthServerPublicKey;
     }
 
     public String getDatabaseType() {
@@ -125,21 +142,32 @@ final public class Configuration {
 
     void parseOAuth2Section(JsonObject jsonObject) {
         JsonObject oauth2Section = jsonObject.getJsonObject(OAUTH2_SECTION, new JsonObject());
-        this.oauth2Enabled = oauth2Section.getBoolean(OAUTH2_ENABLED, false);
-        if (oauth2Enabled) {
-            this.oauth2Provider = oauth2Section.getString(OAUTH2_PROVIDER);
 
-            // TODO: 1/25/18 Support more oauth2 providers
-            if (!oauth2Provider.equals(OAUTH2_PROVIDER_GOOGLE)) {
-                throw new ConfigurationException(MessageFormat.format(
-                    "Unsupported oauth2 provider: {0}", oauth2Provider));
-            }
-
-            // provider-independent configuration
-            this.oauth2ClientID = oauth2Section.getString(OAUTH2_CLIENT_ID);
-            this.oauth2ClientSecret = oauth2Section.getString(OAUTH2_CLIENT_SECRET);
-            this.oauth2Domain = oauth2Section.getString(OAUTH2_DOMAIN);
+        // TODO: 1/25/18 Support more oauth2 providers
+        this.oauth2Provider = oauth2Section.getString(OAUTH2_PROVIDER);
+        if (oauth2Provider == null) {
+            throw new ConfigurationException("No oauth2 provider specified");
+        } else if (
+            !oauth2Provider.equals(OAUTH2_PROVIDER_GOOGLE) &&
+                !oauth2Provider.equals(OAUTH2_PROVIDER_KEYCLOAK)) {
+            throw new ConfigurationException(MessageFormat.format(
+                "Unsupported oauth2 provider: {0}", oauth2Provider));
         }
+
+        // provider-independent configuration
+        this.oauth2ClientID = oauth2Section.getString(OAUTH2_CLIENT_ID);
+        if (oauth2ClientID == null) {
+            throw new ConfigurationException("No oauth2 client ID specified");
+        }
+
+        this.oauth2ClientSecret = oauth2Section.getString(OAUTH2_CLIENT_SECRET);
+        if (oauth2ClientSecret == null) {
+            throw new ConfigurationException("No oauth2 client secret specified");
+        }
+
+        this.oauth2AuthServerURL = oauth2Section.getString(OAUTH2_AUTH_SERVER_URL, DEFAULT_OAUTH2_AUTH_SERVER_URL);
+        this.oauth2AuthServerRealm = oauth2Section.getString(OAUTH2_AUTH_SERVER_REALM, DEFAULT_OAUTH2_AUTH_SERVER_REALM);
+        this.oauth2AuthServerPublicKey = oauth2Section.getString(OAUTH2_AUTH_SERVER_PUBLIC_KEY, DEFAULT_OAUTH2_AUTH_SERVER_PUBLIC_KEY);
     }
 
     void parseStorageSection(JsonObject jsonObject) {
@@ -160,7 +188,7 @@ final public class Configuration {
 
         sb.append("Configuration{");
         sb.append(String.format("startTimeout=%d", startTimeout));
-        sb.append(String.format(",storageRoot='%s'", storageRoot));
+        sb.append(String.format(",httpHost=%s", httpHost));
         sb.append(String.format(",httpPort=%s", httpPort));
         if (useSSL) {
             sb.append(String.format(",keystoreFilename='%s'", keystoreFilename));
@@ -169,21 +197,23 @@ final public class Configuration {
             sb.append(",ssl: disabled");
         }
 
+        sb.append(String.format(",storageRoot='%s'", storageRoot));
         sb.append(String.format(",dbType='%s'", dbType));
         sb.append(String.format(",dbHost='%s'", dbHost));
         sb.append(String.format(",dbPort=%d", dbPort));
         sb.append(String.format(",dbName='%s'", dbName));
 
-        if (oauth2Enabled) {
-            sb.append(String.format(",oauth2Provider='%s'", oauth2Provider));
-            sb.append(String.format(",oauth2ClientID='%s'", oauth2ClientID));
-            sb.append(String.format(",oauth2ClientSecret='%s'", oauth2ClientSecret));
-            sb.append(String.format(",oauth2Domain='%s'", oauth2Domain));
-        } else {
-            sb.append(", oauth2: disabled");
-        }
+        sb.append(String.format(",oauth2Provider='%s'", oauth2Provider));
+        sb.append(String.format(",oauth2ClientID='%s'", oauth2ClientID));
+        sb.append(String.format(",oauth2ClientSecret='%s'", oauth2ClientSecret));
+        sb.append(String.format(",oauth2ClientRealm='%s'", oauth2AuthServerRealm));
+        sb.append(String.format(",oauth2ClientPublicKey='%s'", oauth2AuthServerPublicKey));
         sb.append("}");
 
         return sb.toString();
+    }
+
+    public static Configuration create(JsonObject config) {
+        return new Configuration(config);
     }
 }
