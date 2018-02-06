@@ -31,9 +31,9 @@ import java.util.function.Consumer;
 
 import static org.blackcat.trunk.util.Utils.*;
 
-public class GetResourceRequestHandlerImpl extends BaseUserRequestHandler implements GetResourceRequestHandler {
+final public class GetResourceRequestHandlerImpl extends BaseUserRequestHandler implements GetResourceRequestHandler {
 
-    private Logger logger = LoggerFactory.getLogger(GetResourceRequestHandlerImpl.class);
+    final private Logger logger = LoggerFactory.getLogger(GetResourceRequestHandlerImpl.class);
 
     @Override
     public void handle(RoutingContext ctx) {

@@ -34,9 +34,6 @@ public class WebServerVerticle extends AbstractVerticle {
         /* configure disk storage */
         Storage storage = FileSystemStorage.create(vertx, Paths.get(configuration.getStorageRoot()));
 
-        /* configure request handler */
-        Handler<HttpServerRequest> handler = RequestHandler.create(vertx, configuration, storage);
-
         HttpServerOptions httpServerOptions =
             new HttpServerOptions()
                 // in vertx 2x 100-continues was activated per default, in vertx 3x it is off per default.
@@ -56,7 +53,7 @@ public class WebServerVerticle extends AbstractVerticle {
 
         int httpPort = configuration.getHttpPort();
         vertx.createHttpServer(httpServerOptions)
-            .requestHandler(handler)
+            .requestHandler(RequestHandler.create(vertx, configuration, storage))
             .listen(httpPort, result -> {
                 if (result.succeeded()) {
                     logger.info("Web server is now ready to accept requests on port {}.", httpPort);

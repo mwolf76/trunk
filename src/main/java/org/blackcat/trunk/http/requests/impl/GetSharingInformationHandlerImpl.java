@@ -16,9 +16,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
-public class GetSharingInformationHandlerImpl extends BaseUserRequestHandler implements UserInfoHandler {
+final public class GetSharingInformationHandlerImpl extends BaseUserRequestHandler implements UserInfoHandler {
 
-    private Logger logger = LoggerFactory.getLogger(GetSharingInformationHandlerImpl.class);
+    final private Logger logger = LoggerFactory.getLogger(GetSharingInformationHandlerImpl.class);
 
     @Override
     public void handle(RoutingContext ctx) {

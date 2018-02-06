@@ -10,9 +10,9 @@ import java.nio.file.Path;
 
 import static org.blackcat.trunk.util.Utils.protectedPath;
 
-public class DeleteResourceRequestHandlerImpl extends BaseUserRequestHandler implements PostResourceRequestHandler {
+final public class DeleteResourceRequestHandlerImpl extends BaseUserRequestHandler implements PostResourceRequestHandler {
 
-    private Logger logger = LoggerFactory.getLogger(DeleteResourceRequestHandlerImpl.class);
+    final private Logger logger = LoggerFactory.getLogger(DeleteResourceRequestHandlerImpl.class);
 
     @Override
     public void handle(RoutingContext ctx) {

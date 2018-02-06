@@ -8,15 +8,16 @@ import io.vertx.ext.auth.oauth2.AccessToken;
 import io.vertx.ext.web.RoutingContext;
 import org.blackcat.trunk.http.middleware.UserInfoHandler;
 
-public class UserInfoHandlerImpl implements UserInfoHandler {
-    private Logger logger =  LoggerFactory.getLogger(UserInfoHandlerImpl.class);
+final public class UserInfoHandlerImpl implements UserInfoHandler {
+
+    final private Logger logger =  LoggerFactory.getLogger(UserInfoHandlerImpl.class);
 
     @Override
     public void handle(RoutingContext ctx) {
         User user = ctx.user();
         if (user instanceof AccessToken) {
             AccessToken accessToken = (AccessToken) user;
-            accessToken.userInfo(ar -> {
+            accessToken.introspect(ar -> {
                 if (ar.failed()) {
                     // request didn't succeed because the token was revoked so we
                     // invalidate the token stored in the session and render the
@@ -24,9 +25,9 @@ public class UserInfoHandlerImpl implements UserInfoHandler {
                     ctx.session().destroy();
                     ctx.fail(ar.cause());
                 } else {
-                    JsonObject userInfo = ar.result();
-                    String email = userInfo.getString("email");
-                    logger.info("User email is {}", email);
+                    JsonObject principal = accessToken.principal();
+                    String email = principal.getString("email");
+                    logger.info("User data: {}", principal.toString());
                     ctx.put("email", email);
                     ctx.next();
                 }

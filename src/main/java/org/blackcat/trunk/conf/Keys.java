@@ -2,7 +2,7 @@ package org.blackcat.trunk.conf;
 
 final public class Keys {
     /* SERVER */
-    public static final String SERVER_SECTION = "server";
+    public static final String SERVER_SECTION = "web";
 
     public static final String SERVER_HTTP_HOST = "host";
     public static final String DEFAULT_SERVER_HTTP_HOST = "localhost";

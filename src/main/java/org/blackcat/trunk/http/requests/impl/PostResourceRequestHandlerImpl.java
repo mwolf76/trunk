@@ -5,6 +5,7 @@ import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.streams.Pump;
+import io.vertx.ext.web.FileUpload;
 import io.vertx.ext.web.RoutingContext;
 import org.blackcat.trunk.http.Headers;
 import org.blackcat.trunk.http.requests.PostResourceRequestHandler;
@@ -14,26 +15,25 @@ import org.blackcat.trunk.resource.impl.ErrorResource;
 import org.blackcat.trunk.streams.impl.PumpImpl;
 
 import java.nio.file.Path;
+import java.util.Set;
 
 import static org.blackcat.trunk.util.Utils.protectedPath;
 
-public class PostResourceRequestHandlerImpl extends BaseUserRequestHandler implements PostResourceRequestHandler {
+final public class PostResourceRequestHandlerImpl extends BaseUserRequestHandler implements PostResourceRequestHandler {
 
-    private Logger logger = LoggerFactory.getLogger(PostResourceRequestHandlerImpl.class);
+    final private Logger logger = LoggerFactory.getLogger(PostResourceRequestHandlerImpl.class);
 
     @Override
     public void handle(RoutingContext ctx) {
         super.handle(ctx);
-
-        ctx.request().pause(); /* hold it */
-
+        HttpServerRequest request = ctx.request();
         Path protectedPath = protectedPath(ctx);
 
-        MultiMap headers = ctx.request().headers();
+        MultiMap headers = request.headers();
         String etag = headers.get(Headers.IF_NONE_MATCH_HEADER);
 
         Path resolvedPath = storage.getRoot().resolve(protectedPath);
-        logger.trace("POST {} -> {} [etag = {}]", protectedPath, resolvedPath, etag);
+        logger.debug("POST {} -> {} [etag = {}]", protectedPath, resolvedPath, etag);
 
         storage.putDocument(resolvedPath, etag, resource -> {
 
@@ -61,21 +61,33 @@ public class PostResourceRequestHandlerImpl extends BaseUserRequestHandler imple
                 DocumentContentResource documentContentResource =
                     (DocumentContentResource) resource;
 
-                /* setting up xfer */
-                Pump pump = Pump.pump(ctx.request(), documentContentResource.getWriteStream());
-
-                ctx.request().endHandler(event -> {
-                    logger.info("... incoming file transfer completed, {} bytes transferred.",
-                        ((PumpImpl) pump).getBytesPumped());
-
-                    documentContentResource.getCloseHandler()
-                        .handle(null);
+                Set<FileUpload> fileUploads = ctx.fileUploads();
+                fileUploads.stream().forEach(fu -> {
+                    logger.info("{} -> {} ({})", fu.fileName(), fu.uploadedFileName(), fu.size());
                 });
 
-                logger.info("incoming file transfer started ...");
-
-                pump.start();
-                ctx.request().resume();
+//                if (request.isEnded()) {
+//                    ctx.fail(new RuntimeException("Request is ended"));
+//                    return;
+//                }
+//
+//                /* setting up xfer */
+//                request.pause();
+//
+//                Pump pump = Pump.pump(request, documentContentResource.getWriteStream());
+//
+//                request.endHandler(event -> {
+//                    logger.info("... incoming file transfer completed, {} bytes transferred.",
+//                        ((PumpImpl) pump).getBytesPumped());
+//
+//                    documentContentResource.getCloseHandler()
+//                        .handle(null);
+//                });
+//
+//                logger.info("incoming file transfer started ...");
+//                pump.start();
+//
+//                request.resume();
             }
         });
 

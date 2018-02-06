@@ -6,9 +6,9 @@ import io.vertx.ext.auth.oauth2.AccessToken;
 import io.vertx.ext.web.RoutingContext;
 import org.blackcat.trunk.http.middleware.UserInfoHandler;
 
-public class LogoutHandlerImpl extends BaseUserRequestHandler implements UserInfoHandler {
+final public class LogoutHandlerImpl extends BaseUserRequestHandler implements UserInfoHandler {
 
-    private Logger logger = LoggerFactory.getLogger(GetResourceRequestHandlerImpl.class);
+    final private Logger logger = LoggerFactory.getLogger(GetResourceRequestHandlerImpl.class);
 
     @Override
     public void handle(RoutingContext ctx) {

@@ -13,9 +13,9 @@ import java.nio.file.Path;
 
 import static org.blackcat.trunk.util.Utils.protectedPath;
 
-public class PutResourceRequestHandlerImpl extends BaseUserRequestHandler implements PutResourceRequestHandler {
+final public class PutResourceRequestHandlerImpl extends BaseUserRequestHandler implements PutResourceRequestHandler {
 
-    private Logger logger = LoggerFactory.getLogger(PutResourceRequestHandlerImpl.class);
+    final private Logger logger = LoggerFactory.getLogger(PutResourceRequestHandlerImpl.class);
 
     @Override
     public void handle(RoutingContext ctx) {

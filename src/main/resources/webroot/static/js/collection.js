@@ -148,11 +148,11 @@ function downloadResource(resource, successCallback, errorCallback) {
 
 /* documents only */
 function postResource(resource, resourceName, successCallback, errorCallback) {
-    console.log('Uploading res resource: ' + resource);
+    console.log('Uploading document: ' + resource);
     $.ajax({
         type: 'POST',
         url: resourceName,
-        contentType: resource.type,
+        contentType: "multipart/form-data",
         processData: false,
         data: resource,
         success: successCallback,
@@ -162,7 +162,7 @@ function postResource(resource, resourceName, successCallback, errorCallback) {
 
 /* collections only */
 function putResource(resource, successCallback, errorCallback) {
-    console.log('Putting res resource: ', resource);
+    console.log('Creating collection: ', resource);
     $.ajax({
         type: "PUT",
         url: resource,

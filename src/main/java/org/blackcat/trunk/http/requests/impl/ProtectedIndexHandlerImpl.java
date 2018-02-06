@@ -1,11 +1,16 @@
 package org.blackcat.trunk.http.requests.impl;
 
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
 import org.blackcat.trunk.http.ResponseBuilder;
 import org.blackcat.trunk.http.requests.ProtectedIndexHandler;
 import org.blackcat.trunk.queries.Queries;
 
-public class ProtectedIndexHandlerImpl extends BaseUserRequestHandler implements ProtectedIndexHandler {
+final public class ProtectedIndexHandlerImpl extends BaseUserRequestHandler implements ProtectedIndexHandler {
+
+    final private Logger logger = LoggerFactory.getLogger(ProtectedIndexHandlerImpl.class);
+
     @Override
     public void handle(RoutingContext ctx) {
         super.handle(ctx);

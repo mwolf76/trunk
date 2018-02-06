@@ -1,12 +1,17 @@
 package org.blackcat.trunk.http.requests.impl;
 
 import io.vertx.core.buffer.Buffer;
+import io.vertx.core.logging.Logger;
+import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.templ.TemplateEngine;
 import org.blackcat.trunk.http.Headers;
 import org.blackcat.trunk.http.requests.PublicIndexHandler;
 
-public class PublicIndexHandlerImpl extends BaseUserRequestHandler implements PublicIndexHandler {
+final public class PublicIndexHandlerImpl extends BaseUserRequestHandler implements PublicIndexHandler {
+
+    final private Logger logger = LoggerFactory.getLogger(PublicIndexHandlerImpl.class);
+
     @Override
     public void handle(RoutingContext ctx) {
         super.handle(ctx);

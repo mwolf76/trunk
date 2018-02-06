@@ -2,6 +2,7 @@ package org.blackcat.trunk.http;
 
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
+import io.vertx.core.http.HttpMethod;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
@@ -27,14 +28,16 @@ import static org.blackcat.trunk.conf.Keys.OAUTH2_PROVIDER_KEYCLOAK;
 
 public class RequestHandler implements Handler<HttpServerRequest> {
 
-    private Configuration configuration;
-    private Vertx vertx;
-    private Router router;
-    private TemplateEngine templateEngine;
-    private Logger logger = LoggerFactory.getLogger(RequestHandler.class);
+    private final String OAUTH2_CALLBACK_LOCATION = "/callback";
 
-    private Storage storage;
-    private ResponseBuilder responseBuilder;
+    private final Configuration configuration;
+    private final Vertx vertx;
+    private final Router router;
+    private final TemplateEngine templateEngine;
+    private final Logger logger = LoggerFactory.getLogger(RequestHandler.class);
+
+    private final Storage storage;
+    private final ResponseBuilder responseBuilder;
 
     public RequestHandler(final Vertx vertx,
                           final Configuration configuration,
@@ -48,9 +51,9 @@ public class RequestHandler implements Handler<HttpServerRequest> {
         this.responseBuilder = new ResponseBuilder(templateEngine, logger);
 
         setupMiddlewareHandlers();
-        setupPublicHandlers();
         setupOAuth2Handlers();
         setupProtectedHandlers();
+        setupPublicHandlers();
         setupErrorHandlers();
     }
 
@@ -68,24 +71,30 @@ public class RequestHandler implements Handler<HttpServerRequest> {
         // We need cookies, sessions and request bodies
         router.route().handler(CookieHandler.create());
 
-        SessionHandler sessionHandler = SessionHandler.create(LocalSessionStore.create(vertx));
+        SessionHandler sessionHandler = SessionHandler.create(LocalSessionStore.create(vertx))
+            .setCookieHttpOnlyFlag(true);
+
         if (configuration.isSSLEnabled()) {
             // avoid reading, sniffing hijacking or tampering your sessions (requires SSL)
-            sessionHandler.setCookieHttpOnlyFlag(true)
+            sessionHandler
                 .setCookieSecureFlag(true);
-        }
+        } else sessionHandler.setNagHttps(false); /* avoid nagging about not using https */
+
         router.route().handler(sessionHandler);
     }
 
     private void setupErrorHandlers() {
         /* invalid URL */
-        router.getWithRegex(".*").handler(responseBuilder::notFound);
+        router.getWithRegex(".*")
+            .handler(responseBuilder::notFound);
 
         /* invalid method */
-        router.routeWithRegex(".*").handler(responseBuilder::notAllowed);
+        router.routeWithRegex(".*")
+            .handler(responseBuilder::notAllowed);
 
         /* errors */
-        router.route().failureHandler(responseBuilder::internalServerError);
+        router.route()
+            .failureHandler(responseBuilder::internalServerError);
     }
 
     private void setupProtectedHandlers() {
@@ -98,11 +107,10 @@ public class RequestHandler implements Handler<HttpServerRequest> {
         router.getWithRegex("/share/.*")
             .handler(GetSharingInformationRequestHandler.create());
 
-        router.routeWithRegex("/share/.*")
+        router.putWithRegex("/share/.*")
             .handler(BodyHandler.create());
 
         router.putWithRegex("/share/.*")
-            .handler(BodyHandler.create())
             .handler(PutSharingInformationRequestHandler.create());
 
         router.getWithRegex("/protected/.*")
@@ -120,7 +128,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
 
     private void setupPublicHandlers() {
         /* public index (unrestricted) */
-        router.route("/")
+        router.get("/")
             .handler(PublicIndexHandler.create());
 
         /* static files (unrestricted) */
@@ -129,9 +137,6 @@ public class RequestHandler implements Handler<HttpServerRequest> {
     }
 
     private void setupOAuth2Handlers() {
-
-        final String OAUTH2_CALLBACK_LOCATION = "/callback";
-
         OAuth2Auth authProvider = null;
         final String oauth2ProviderName = configuration.getOauth2Provider();
 
@@ -161,10 +166,10 @@ public class RequestHandler implements Handler<HttpServerRequest> {
 
         /* Keep protected contents under oauth2 */
         authHandler.setupCallback(router.get(OAUTH2_CALLBACK_LOCATION));
-        router.route("/protected/*").handler(authHandler);
+        router.routeWithRegex("/protected/.*").handler(authHandler);
 
         /* An extra handler to fetch user info into context */
-        router.route("/protected/*").handler(UserInfoHandler.create());
+        router.routeWithRegex("/protected/.*").handler(UserInfoHandler.create());
     }
 
     private JsonObject buildKeyCloakConfiguration() {
@@ -179,7 +184,7 @@ public class RequestHandler implements Handler<HttpServerRequest> {
 
     @Override
     public void handle(HttpServerRequest request) {
-        logger.info("Accepting HTTP Request: {} {} ...", request.method(), request.uri());
+        logger.info("Routing HTTP Request: {} {}", request.method(), request.uri());
         router.accept(request);
     }
 

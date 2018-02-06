@@ -27,9 +27,10 @@ import java.util.stream.Stream;
 import static org.blackcat.trunk.util.Utils.isValidEmail;
 import static org.blackcat.trunk.util.Utils.urlDecode;
 
-public class PutSharingInformationRequestHandlerImpl extends BaseUserRequestHandler implements PutSharingInformationRequestHandler {
+final public class PutSharingInformationRequestHandlerImpl extends BaseUserRequestHandler
+    implements PutSharingInformationRequestHandler {
 
-    private Logger logger = LoggerFactory.getLogger(PutSharingInformationRequestHandlerImpl.class);
+    final private Logger logger = LoggerFactory.getLogger(PutSharingInformationRequestHandlerImpl.class);
 
     @Override
     public void handle(RoutingContext ctx) {
