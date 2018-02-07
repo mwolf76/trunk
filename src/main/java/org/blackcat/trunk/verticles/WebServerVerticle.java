@@ -13,7 +13,7 @@ import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.net.JksOptions;
 import org.blackcat.trunk.conf.Configuration;
-import org.blackcat.trunk.http.requests.impl.MainHandlerImpl;
+import org.blackcat.trunk.http.requests.MainHandler;
 import org.blackcat.trunk.storage.Storage;
 import org.blackcat.trunk.storage.impl.FileSystemStorage;
 
@@ -52,7 +52,7 @@ public class WebServerVerticle extends AbstractVerticle {
 
         int httpPort = configuration.getHttpPort();
         vertx.createHttpServer(httpServerOptions)
-            .requestHandler(MainHandlerImpl.create(vertx, configuration, storage))
+            .requestHandler(MainHandler.create(vertx, configuration, storage))
             .listen(httpPort, result -> {
                 if (result.succeeded()) {
                     logger.info("Web server is now ready to accept requests on port {}.", httpPort);

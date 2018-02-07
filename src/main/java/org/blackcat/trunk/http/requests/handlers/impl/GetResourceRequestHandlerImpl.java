@@ -12,6 +12,7 @@ import io.vertx.ext.web.RoutingContext;
 import org.blackcat.trunk.http.Headers;
 import org.blackcat.trunk.http.requests.handlers.GetResourceRequestHandler;
 import org.blackcat.trunk.mappers.ShareMapper;
+import org.blackcat.trunk.mappers.UserMapper;
 import org.blackcat.trunk.queries.Queries;
 import org.blackcat.trunk.resource.Resource;
 import org.blackcat.trunk.resource.impl.CollectionResource;
@@ -38,39 +39,53 @@ final public class GetResourceRequestHandlerImpl extends BaseUserRequestHandler 
     @Override
     public void handle(RoutingContext ctx) {
         super.handle(ctx);
-        ctx.request().resume();
-
         Path protectedPath = protectedPath(ctx);
 
         logger.info("Getting resource {} -> {}", ctx.request().path(), protectedPath);
-        Queries.findCreateUserEntityByEmail(ctx.vertx(), ctx.get("email"), userMapper -> {
+        Queries.findCreateUserEntityByEmail(ctx.vertx(), ctx.get("email"), userMapperAsyncResult -> {
 
-            /* check for ownership */
-            if (protectedPath.startsWith(Paths.get(userMapper.getUuid()))) {
-                logger.info("Ownership granted to user {}. No further auth checks required.",
-                    userMapper.getEmail());
+            if (userMapperAsyncResult.failed())
+                ctx.fail(userMapperAsyncResult.cause());
+            else {
+                UserMapper userMapper =
+                    userMapperAsyncResult.result();
 
-                Queries.findShareEntity(ctx.vertx(), protectedPath, shareMapper -> {
-                    getResourceAux(ctx, true, shareMapper);
-                });
-            } else {
-                /* not the owner, authorized? */
-                Queries.findShareEntity(ctx.vertx(), protectedPath, shareMapper -> {
+                /* check for ownership */
+                if (protectedPath.startsWith(Paths.get(userMapper.getUuid()))) {
+                    logger.info("Ownership granted to user {}. No further auth checks required.",
+                        userMapper.getEmail());
 
-                    if (shareMapper.isAuthorized(userMapper.getEmail())) {
+                    Queries.findShareEntity(ctx.vertx(), protectedPath, shareMapperAsyncResult -> {
+                        if (shareMapperAsyncResult.failed())
+                            ctx.fail(shareMapperAsyncResult.cause());
+                        else {
+                            ShareMapper shareMapper = shareMapperAsyncResult.result();
+                            getResourceAux(ctx, true, shareMapper);
+                        }
+                    });
+                } else {
+                    /* not the owner, authorized? */
+                    Queries.findShareEntity(ctx.vertx(), protectedPath, shareMapperAsyncResult -> {
 
-                        logger.info("Auth granted by sharing permissions to user {}.",
-                            userMapper.getEmail());
+                        if (shareMapperAsyncResult.failed())
+                            ctx.fail(shareMapperAsyncResult.cause());
+                        else {
+                            ShareMapper shareMapper = shareMapperAsyncResult.result();
+                            if (shareMapper.isAuthorized(userMapper.getEmail())) {
 
-                        getResourceAux(ctx, false, shareMapper);
-                    }
-                    else {
-                        logger.warn("Not the owner, nor sharing permission exists for user {}. Access denied.",
-                            userMapper.getEmail());
+                                logger.info("Auth granted by sharing permissions to user {}.",
+                                    userMapper.getEmail());
 
-                        responseBuilder.forbidden(ctx);
-                    }
-                });
+                                getResourceAux(ctx, false, shareMapper);
+                            } else {
+                                logger.warn("Not the owner, nor sharing permission exists for user {}. Access denied.",
+                                    userMapper.getEmail());
+
+                                responseBuilder.forbidden(ctx);
+                            }
+                        }
+                    });
+                }
             }
         });
     }

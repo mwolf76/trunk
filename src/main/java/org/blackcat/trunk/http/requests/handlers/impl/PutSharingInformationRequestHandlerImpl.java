@@ -10,6 +10,7 @@ import io.vertx.ext.auth.oauth2.AccessToken;
 import io.vertx.ext.auth.oauth2.KeycloakHelper;
 import io.vertx.ext.web.RoutingContext;
 import org.blackcat.trunk.http.requests.handlers.PutSharingInformationRequestHandler;
+import org.blackcat.trunk.mappers.UserMapper;
 import org.blackcat.trunk.queries.Queries;
 
 import java.io.IOException;
@@ -66,49 +67,57 @@ final public class PutSharingInformationRequestHandlerImpl extends BaseUserReque
         JsonObject idToken = KeycloakHelper.idToken(at.principal());
         String email = idToken.getString("email");
 
-        Queries.findCreateUserEntityByEmail(ctx.vertx(), email, userMapper -> {
+        Queries.findCreateUserEntityByEmail(ctx.vertx(), email, userMapperAsyncResult -> {
+            if (userMapperAsyncResult.failed())
+                ctx.fail(userMapperAsyncResult.cause());
+            else {
+                UserMapper userMapper = userMapperAsyncResult.result();
 
-            vertx.executeBlocking(future -> {
-                try (Stream<Path> pathStream = storage.streamDirectory(storage.getRoot().resolve(collectionPath))) {
-                    future.complete(pathStream.collect(Collectors.toList()));
-                } catch (IOException ioe) {
-                    ioe.printStackTrace();
-                }
-            }, res -> {
-                final List<Path> paths = (List<Path>) res.result();
-                if (paths == null) {
-                    responseBuilder.internalServerError(ctx);
-                    return;
-                }
+                vertx.executeBlocking(future -> {
+                    try (Stream<Path> pathStream = storage.streamDirectory(storage.getRoot().resolve(collectionPath))) {
+                        future.complete(pathStream.collect(Collectors.toList()));
+                    } catch (IOException ioe) {
+                        ioe.printStackTrace();
+                    }
+                }, res -> {
+                    final List<Path> paths = (List<Path>) res.result();
+                    if (paths == null) {
+                        responseBuilder.internalServerError(ctx);
+                        return;
+                    }
 
-                /* first link of the chain */
-                Future<Void> initFuture = Future.future(event -> {
-                    logger.info("Started updating share permissions, owner is {}.", userMapper.getEmail());
-                    responseBuilder.done(ctx); /* return control to the user, process will continue in background */
-                });
-                Future<Void> prevFuture = initFuture;
+                    /* first link of the chain */
+                    Future<Void> initFuture = Future.future(event -> {
+                        logger.info("Started updating share permissions, owner is {}.", userMapper.getEmail());
+                        responseBuilder.done(ctx); /* return control to the user, process will continue in background */
+                    });
+                    Future<Void> prevFuture = initFuture;
 
-                for (Path path : paths) {
-                    Future chainFuture = Future.future();
+                    for (Path path : paths) {
+                        Future chainFuture = Future.future();
+                        prevFuture.compose(v -> {
+                            if (userMapper != null && collectionPath.startsWith(Paths.get(userMapper.getUuid()))) {
+                                Queries.findOrUpdateShareEntity(ctx.vertx(), userMapper, storage.getRoot().relativize(path), newAuthorizedUsers, ar -> {
+                                    if (ar.failed())
+                                        chainFuture.fail(ar.cause());
+                                    else
+                                        chainFuture.complete();
+                                });
+                            } else {
+                                chainFuture.fail("No bloody way!");
+                            }
+                        }, chainFuture);
+
+                        prevFuture = chainFuture;
+                    }
                     prevFuture.compose(v -> {
-                        if (userMapper != null && collectionPath.startsWith(Paths.get(userMapper.getUuid()))) {
-                            Queries.findOrUpdateShareEntity(ctx.vertx(), userMapper, storage.getRoot().relativize(path), newAuthorizedUsers, done -> {
-                                chainFuture.complete();
-                            });
-                        } else {
-                            chainFuture.fail("No bloody way!");
-                        }
-                    }, chainFuture);
+                        logger.info("Done updating share permissions ({} entries processed).", paths.size());
+                    }, initFuture);
 
-                    prevFuture = chainFuture;
-                }
-                prevFuture.compose(v -> {
-                    logger.info("Done updating share permissions ({} entries processed).", paths.size());
-                }, initFuture);
-
-                /* let's get this thing started ... */
-                initFuture.complete();
-            });
+                    /* let's get this thing started ... */
+                    initFuture.complete();
+                });
+            }
         });
     }
 }

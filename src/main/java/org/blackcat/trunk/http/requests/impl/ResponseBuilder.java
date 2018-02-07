@@ -11,7 +11,7 @@ import io.vertx.ext.web.templ.TemplateEngine;
 import org.blackcat.trunk.http.Headers;
 import org.blackcat.trunk.http.StatusCode;
 
-final class ResponseBuilder {
+public final class ResponseBuilder {
 
     private TemplateEngine templateEngine;
     private Logger logger;

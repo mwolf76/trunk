@@ -6,11 +6,7 @@ import de.braintags.io.vertx.pojomapper.dataaccess.write.IWrite;
 import de.braintags.io.vertx.pojomapper.dataaccess.write.IWriteEntry;
 import de.braintags.io.vertx.pojomapper.dataaccess.write.IWriteResult;
 import de.braintags.io.vertx.pojomapper.mongo.MongoDataStore;
-import io.vertx.core.AbstractVerticle;
-import io.vertx.core.Context;
-import io.vertx.core.Future;
-import io.vertx.core.Handler;
-import io.vertx.core.eventbus.EventBus;
+import io.vertx.core.*;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -27,6 +23,11 @@ final public class DataStoreVerticle extends AbstractVerticle {
 
     private Logger logger;
     private MongoDataStore mongoDataStore;
+
+    public static final int ERR_COULD_NOT_CREATE_USER  = 1;
+    public static final int ERR_COULD_NOT_FIND_SHARE   = 2;
+    public static final int ERR_COULD_NOT_UPDATE_SHARE = 3;
+    public static final int ERR_UNSUPPORTED_QUERY_TYPE = 4;
 
     @Override
     public void start(Future<Void> startFuture) {
@@ -62,8 +63,7 @@ final public class DataStoreVerticle extends AbstractVerticle {
     }
 
     private void setupMessageHandlers() {
-        EventBus eventBus = vertx.eventBus();
-        eventBus
+        vertx.eventBus()
             .consumer("data-store", msg -> {
                 JsonObject obj = (JsonObject) msg.body();
                 String queryType = obj.getString("type");
@@ -71,26 +71,40 @@ final public class DataStoreVerticle extends AbstractVerticle {
 
                 /* msg dispatch */
                 if (queryType.equals(QueryType.FIND_CREATE_USER.getTag())) {
-                    findCreateUser(params, user -> {
-                        msg.reply(JsonObject.mapFrom(user));
+                    findCreateUser(params, userMapperAsyncResult -> {
+                        if (userMapperAsyncResult.failed())
+                            msg.fail(ERR_COULD_NOT_CREATE_USER, "Could not create user");
+                        else {
+                            UserMapper userMapper = userMapperAsyncResult.result();
+                            msg.reply(JsonObject.mapFrom(userMapper));
+                        }
                     });
                 } else if (queryType.equals(QueryType.FIND_SHARE.getTag())) {
-                    findShare(params, share -> {
-                        msg.reply(JsonObject.mapFrom(share));
+                    findShare(params, shareMapperAsyncResult -> {
+                        if (shareMapperAsyncResult.failed())
+                            msg.fail(ERR_COULD_NOT_FIND_SHARE, "Could not find share");
+                        else {
+                            ShareMapper shareMapper = shareMapperAsyncResult.result();
+                            msg.reply(JsonObject.mapFrom(shareMapper));
+                        }
                     });
                 } else if (queryType.equals(QueryType.FIND_UPDATE_SHARE.getTag())) {
-                    findUpdateShare(params, share -> {
-                        msg.reply(JsonObject.mapFrom(share));
+                    findUpdateShare(params, shareMapperAsyncResult -> {
+                        if (shareMapperAsyncResult.failed())
+                            msg.fail(ERR_COULD_NOT_UPDATE_SHARE, "Could not update share");
+                        else {
+                            ShareMapper shareMapper = shareMapperAsyncResult.result();
+                            msg.reply(JsonObject.mapFrom(shareMapper));
+                        }
                     });
                 } else {
                     logger.error("Unsupported query type: {}", queryType);
+                    msg.fail(ERR_UNSUPPORTED_QUERY_TYPE, "Unsupported query type");
                 }
             });
     }
 
-    private void findCreateUser(JsonObject params, Handler<UserMapper> handler) {
-
-        /* fetch params */
+    private void findCreateUser(JsonObject params, Handler<AsyncResult<UserMapper>> handler) {
         String email = params.getString("email");
 
         IQuery<UserMapper> query = mongoDataStore.createQuery(UserMapper.class);
@@ -98,23 +112,20 @@ final public class DataStoreVerticle extends AbstractVerticle {
         query.execute(queryAsyncResult -> {
             if (queryAsyncResult.failed()) {
                 Throwable cause = queryAsyncResult.cause();
-
-                logger.error(cause);
-                throw new RuntimeException(cause);
+                logger.error(cause.toString());
+                handler.handle(Future.failedFuture(cause));
             } else {
                 IQueryResult<UserMapper> queryResult = queryAsyncResult.result();
                 if (!queryResult.isEmpty()) {
                     queryResult.iterator().next(nextAsyncResult -> {
                         if (nextAsyncResult.failed()) {
                             Throwable cause = nextAsyncResult.cause();
-
-                            logger.error(cause);
-                            throw new RuntimeException(cause);
+                            logger.error(cause.toString());
+                            handler.handle(Future.failedFuture(cause));
                         } else {
                             UserMapper userMapper = nextAsyncResult.result();
-
                             logger.trace("Found matching user for {}: {}", email, userMapper);
-                            handler.handle(userMapper);
+                            handler.handle(Future.succeededFuture(userMapper));
                         }
                     });
                 } else {
@@ -129,15 +140,13 @@ final public class DataStoreVerticle extends AbstractVerticle {
                     write.save(result -> {
                         if (result.failed()) {
                             Throwable cause = result.cause();
-
                             logger.error(cause.toString());
-                            throw new RuntimeException(cause);
+                            handler.handle(Future.failedFuture(cause));
                         } else {
                             IWriteResult writeResult = result.result();
                             IWriteEntry entry = writeResult.iterator().next();
-
                             logger.trace("Created new userMapper for {}: {}", email, entry.getStoreObject());
-                            handler.handle(userMapper);
+                            handler.handle(Future.succeededFuture(userMapper));
                         }
                     });
                 }
@@ -145,82 +154,75 @@ final public class DataStoreVerticle extends AbstractVerticle {
         });
     }
 
-    private void findShare(JsonObject params, Handler<ShareMapper> handler) {
-
-        /* fetch params */
+    private void findShare(JsonObject params, Handler<AsyncResult<ShareMapper>> handler) {
         String collectionPath = params.getString("collectionPath");
 
         IQuery<ShareMapper> shareQuery = mongoDataStore.createQuery(ShareMapper.class);
         shareQuery.field("collectionPath").is(collectionPath);
         shareQuery.execute(shareQueryAsyncResult -> {
-
             if (shareQueryAsyncResult.failed()) {
                 Throwable cause = shareQueryAsyncResult.cause();
-
-                logger.error(cause);
-                throw new RuntimeException(cause);
+                logger.error(cause.toString());
+                handler.handle(Future.failedFuture(cause));
             } else {
                 IQueryResult<ShareMapper> shareQueryResult = shareQueryAsyncResult.result();
-                if (! shareQueryResult.isEmpty()) {
+                if (!shareQueryResult.isEmpty()) {
                     shareQueryResult.iterator().next(shareNextAsyncResult -> {
                         if (shareNextAsyncResult.failed()) {
                             Throwable cause = shareNextAsyncResult.cause();
-
                             logger.error(cause);
-                            throw new RuntimeException(cause);
+                            handler.handle(Future.failedFuture(cause));
                         } else {
                             ShareMapper shareMapper = shareNextAsyncResult.result();
-
-                            /* found share record */
                             logger.trace("Found sharing info {} for {}", shareMapper, collectionPath);
-                            handler.handle(shareMapper);
+                            handler.handle(Future.succeededFuture(shareMapper));
                         }
                     });
-                }
-                else {
+                } else {
                     logger.trace("No sharing info found for {}", collectionPath);
                     ShareMapper shareMapper = new ShareMapper();
                     shareMapper.setCollectionPath(collectionPath);
-                    handler.handle(shareMapper);
+                    handler.handle(Future.succeededFuture(shareMapper));
                 }
             }
         });
     }
 
-    private void findUpdateShare(JsonObject params, Handler<ShareMapper> handler) {
-
-        /* fetch params */
+    private void findUpdateShare(JsonObject params, Handler<AsyncResult<ShareMapper>> handler) {
         UserMapper owner = params.getJsonObject("owner").mapTo(UserMapper.class);
         String collectionPath = params.getString("collectionPath");
         List<String> authorizedUsers = params.getJsonArray("authorizedUsers").getList();
 
         findShare(new JsonObject()
-                .put("collectionPath", collectionPath), shareMapper -> {
+                      .put("collectionPath", collectionPath), shareMapperAsyncResult -> {
 
-            IWrite<ShareMapper> shareWrite = mongoDataStore.createWrite(ShareMapper.class);
+            if (shareMapperAsyncResult.failed()) {
+                Throwable cause = shareMapperAsyncResult.cause();
+                logger.error(cause.toString());
+                handler.handle(Future.failedFuture(cause));
+            } else {
+                ShareMapper shareMapper = shareMapperAsyncResult.result();
+                IWrite<ShareMapper> shareWrite = mongoDataStore.createWrite(ShareMapper.class);
 
-            shareMapper.setOwner(owner);
-            shareMapper.setAuthorizedUsers(authorizedUsers);
+                shareMapper.setOwner(owner);
+                shareMapper.setAuthorizedUsers(authorizedUsers);
 
-            shareWrite.add(shareMapper);
-            shareWrite.save(shareWriteAsyncResult -> {
+                shareWrite.add(shareMapper);
+                shareWrite.save(shareWriteAsyncResult -> {
 
-                if (shareWriteAsyncResult.failed()) {
-                    Throwable cause = shareWriteAsyncResult.cause();
+                    if (shareWriteAsyncResult.failed()) {
+                        Throwable cause = shareWriteAsyncResult.cause();
+                        logger.error(cause);
+                        handler.handle(Future.failedFuture(cause));
+                    } else {
+                        IWriteResult shareWriteResult = shareWriteAsyncResult.result();
+                        IWriteEntry shareWriteEntry = shareWriteResult.iterator().next();
 
-                    logger.error(cause);
-                    throw new RuntimeException(cause);
-                } else {
-                    IWriteResult shareWriteResult = shareWriteAsyncResult.result();
-                    IWriteEntry shareWriteEntry = shareWriteResult.iterator().next();
-
-                    logger.trace("{} {}",
-                            shareWriteEntry.getAction(),
-                            shareWriteEntry.getStoreObject());
-
-                    handler.handle(shareMapper);
-                }
-            });
+                        logger.trace("{} {}", shareWriteEntry.getAction(), shareWriteEntry.getStoreObject());
+                        handler.handle(Future.succeededFuture(shareMapper));
+                    }
+                });
+            }
         });
     }
-};
+}

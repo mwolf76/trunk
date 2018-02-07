@@ -31,8 +31,7 @@ public class MainVerticle extends AbstractVerticle {
         verticles
             .stream()
             .forEach(verticle -> {
-                vertx.deployVerticle(verticle, new DeploymentOptions()
-                                                   .setConfig(config), deployResponse -> {
+                vertx.deployVerticle(verticle, new DeploymentOptions().setConfig(config), deployResponse -> {
                     String simpleName = verticle.getClass().getSimpleName();
                     if (deployResponse.failed()) {
                         deployResponse.cause().printStackTrace();

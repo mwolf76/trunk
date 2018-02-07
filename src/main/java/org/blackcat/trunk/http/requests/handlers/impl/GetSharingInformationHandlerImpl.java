@@ -8,6 +8,7 @@ import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
 import org.blackcat.trunk.http.Headers;
 import org.blackcat.trunk.http.middleware.UserInfoHandler;
+import org.blackcat.trunk.mappers.ShareMapper;
 import org.blackcat.trunk.mappers.UserMapper;
 import org.blackcat.trunk.queries.Queries;
 import org.blackcat.trunk.util.Utils;
@@ -32,27 +33,36 @@ final public class GetSharingInformationHandlerImpl extends BaseUserRequestHandl
         String collectionPathString = collectionPath.toString();
 
         String email = ctx.get("email");
-        Queries.findCreateUserEntityByEmail(ctx.vertx(), email, (UserMapper userMapper) -> {
+        Queries.findCreateUserEntityByEmail(ctx.vertx(), email, userMapperAsyncResult -> {
+            if (userMapperAsyncResult.failed())
+                ctx.fail(userMapperAsyncResult.cause());
+            else {
+                Queries.findShareEntity(ctx.vertx(), collectionPath, shareMapperAsyncResult -> {
 
-            Queries.findShareEntity(ctx.vertx(), collectionPath, shareMapper -> {
-                JsonArray jsonArray = new JsonArray();
+                    if (shareMapperAsyncResult.failed())
+                        ctx.fail(shareMapperAsyncResult.cause());
+                    else {
+                        ShareMapper shareMapper = shareMapperAsyncResult.result();
+                        JsonArray jsonArray = new JsonArray();
 
-                List<String> authorizedUsers = shareMapper.getAuthorizedUsers();
-                for (String authorizedUser : authorizedUsers) {
-                    jsonArray.add(authorizedUser);
-                }
+                        List<String> authorizedUsers = shareMapper.getAuthorizedUsers();
+                        for (String authorizedUser : authorizedUsers) {
+                            jsonArray.add(authorizedUser);
+                        }
 
-                String body = new JsonObject()
-                                  .put("data", new JsonObject()
-                                                   .put("collectionPath", collectionPathString)
-                                                   .put("authorizedUsers", jsonArray))
-                                  .encodePrettily();
+                        String body = new JsonObject()
+                                          .put("data", new JsonObject()
+                                                           .put("collectionPath", collectionPathString)
+                                                           .put("authorizedUsers", jsonArray))
+                                          .encodePrettily();
 
-                ctx.response()
-                    .putHeader(Headers.CONTENT_LENGTH_HEADER, String.valueOf(body.length()))
-                    .putHeader(Headers.CONTENT_TYPE_HEADER, "application/json; charset=utf-8")
-                    .end(body);
-            });
+                        ctx.response()
+                            .putHeader(Headers.CONTENT_LENGTH_HEADER, String.valueOf(body.length()))
+                            .putHeader(Headers.CONTENT_TYPE_HEADER, "application/json; charset=utf-8")
+                            .end(body);
+                    }
+                });
+            }
         });
     }
 }

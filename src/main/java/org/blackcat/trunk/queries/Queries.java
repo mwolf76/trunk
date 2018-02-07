@@ -1,5 +1,7 @@
 package org.blackcat.trunk.queries;
 
+import io.vertx.core.AsyncResult;
+import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonArray;
@@ -11,14 +13,15 @@ import org.blackcat.trunk.mappers.UserMapper;
 import java.nio.file.Path;
 import java.util.List;
 
-public class Queries {
+final public class Queries {
     /**
      * Retrieves a User entity by email, or creates a new one if no such entity exists.
      *
      * @param email
      * @param handler
      */
-    static public void findCreateUserEntityByEmail(Vertx vertx, String email, Handler<UserMapper> handler) {
+    static public void findCreateUserEntityByEmail(Vertx vertx, String email,
+                                                   Handler<AsyncResult<UserMapper>> handler) {
         JsonObject query = new JsonObject()
                                .put("type", QueryType.FIND_CREATE_USER.getTag())
                                .put("params", new JsonObject()
@@ -27,10 +30,10 @@ public class Queries {
         vertx.eventBus()
             .send("data-store", query, reply -> {
                 if (reply.failed())
-                    handler.handle(null);
+                    handler.handle(Future.failedFuture(reply.cause()));
                 else {
                     JsonObject obj = (JsonObject) reply.result().body();
-                    handler.handle(obj.mapTo(UserMapper.class));
+                    handler.handle(Future.succeededFuture(obj.mapTo(UserMapper.class)));
                 }
             });
     }
@@ -45,7 +48,7 @@ public class Queries {
      * @param handler
      */
     static public void findOrUpdateShareEntity(Vertx vertx, UserMapper owner, Path collectionPath,
-                                               List<String> authorizedUsers, Handler<ShareMapper> handler) {
+                                               List<String> authorizedUsers, Handler<AsyncResult<ShareMapper>> handler) {
 
         JsonObject query = new JsonObject()
                                .put("type", QueryType.FIND_UPDATE_SHARE.getTag())
@@ -57,10 +60,10 @@ public class Queries {
         vertx.eventBus()
             .send("data-store", query, reply -> {
                 if (reply.failed())
-                    handler.handle(null);
+                    handler.handle(Future.failedFuture(reply.cause()));
                 else {
                     JsonObject obj = (JsonObject) reply.result().body();
-                    handler.handle(obj.mapTo(ShareMapper.class));
+                    handler.handle(Future.succeededFuture(obj.mapTo(ShareMapper.class)));
                 }
             });
     }
@@ -71,7 +74,7 @@ public class Queries {
      * @param collectionPath
      * @param handler
      */
-    static public void findShareEntity(Vertx vertx, Path collectionPath, Handler<ShareMapper> handler) {
+    static public void findShareEntity(Vertx vertx, Path collectionPath, Handler<AsyncResult<ShareMapper>> handler) {
         JsonObject query = new JsonObject()
                                .put("type", QueryType.FIND_SHARE.getTag())
                                .put("params", new JsonObject()
@@ -79,10 +82,10 @@ public class Queries {
         vertx.eventBus()
             .send("data-store", query, reply -> {
                 if (reply.failed())
-                    handler.handle(null);
+                    handler.handle(Future.failedFuture(reply.cause()));
                 else {
                     JsonObject obj = (JsonObject) reply.result().body();
-                    handler.handle(obj.mapTo(ShareMapper.class));
+                    handler.handle(Future.succeededFuture(obj.mapTo(ShareMapper.class)));
                 }
             });
     }
