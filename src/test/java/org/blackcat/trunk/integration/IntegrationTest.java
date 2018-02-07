@@ -23,6 +23,10 @@ import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
+import javax.xml.soap.Text;
+import java.awt.*;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -47,7 +51,9 @@ public class IntegrationTest {
     static final String loginButtonXPath = "//*[@id=\"kc-login\"]";
     static final String loginFormXPath = "//*[@id=\"kc-form-login\"]";
     static final String additionalCollectionNameInputXPath = "//*[@id=\"additional-collection-resource-input\"]";
-
+    static final String addDocumentTabInputXPath = "/html/body/div[1]/div[1]/div[5]/div/div/div[2]/ul/li[2]/a";
+    static final String fileSelectorXPath = "//*[@id=\"additional-resource-file-selector\"]";
+    static final String commitDocumentButtonXPath = "//*[@id=\"commit-added-resource-file-label\"]";
     private WebDriver driver;
 
     @Rule
@@ -59,7 +65,6 @@ public class IntegrationTest {
         options.setHeadless(true);
         options.setAcceptInsecureCerts(true);
         options.addArguments("test-type");
-        options.addArguments("headless");
         options.addArguments("--disable-web-security");
         options.addArguments("--allow-running-insecure-content");
         options.addArguments("--allow-insecure-localhost");
@@ -136,6 +141,67 @@ public class IntegrationTest {
 
             String text = firstCollection.getText().split("\n")[0];
             context.assertEquals("whatever", text);
+
+            async.complete();
+        });
+    }
+
+    @Test(timeout=10000)
+    public void uploadDocument(TestContext context) {
+        Async async = context.async();
+        deployForTesting(rule.vertx(), done -> {
+            adminLogin();
+
+            int initialLength = driver.getPageSource().length();
+
+            WebElement plusButton = driver.findElement(By.xpath(plusButtonXPath));
+            plusButton.click();
+
+            new WebDriverWait(driver, 2)
+                .until(ExpectedConditions.visibilityOfElementLocated(
+                    By.xpath("/html/body/div[1]/div[1]/div[5]/div")));
+
+            WebElement documentTab = driver.findElement(By.xpath(addDocumentTabInputXPath));
+            documentTab.click();
+
+            WebElement fileSelector = driver.findElement(By.xpath(fileSelectorXPath));
+            fileSelector.sendKeys("/home/markus/test.txt");
+
+            WebElement commitButton = driver.findElement(By.xpath(commitDocumentButtonXPath));
+            commitButton.click();
+
+            int laterLength = driver.getPageSource().length();
+            context.assertTrue(laterLength > initialLength);
+
+            async.complete();
+        });
+    }
+
+    public void deleteDocument(TestContext context) {
+        Async async = context.async();
+        deployForTesting(rule.vertx(), done -> {
+            adminLogin();
+
+            int initialLength = driver.getPageSource().length();
+
+            WebElement plusButton = driver.findElement(By.xpath(plusButtonXPath));
+            plusButton.click();
+
+            new WebDriverWait(driver, 2)
+                .until(ExpectedConditions.visibilityOfElementLocated(
+                    By.xpath("/html/body/div[1]/div[1]/div[5]/div")));
+
+            WebElement documentTab = driver.findElement(By.xpath(addDocumentTabInputXPath));
+            documentTab.click();
+
+            WebElement fileSelector = driver.findElement(By.xpath(fileSelectorXPath));
+            fileSelector.sendKeys("/home/markus/test.txt");
+
+            WebElement commitButton = driver.findElement(By.xpath(commitDocumentButtonXPath));
+            commitButton.click();
+
+            int laterLength = driver.getPageSource().length();
+            context.assertTrue(laterLength > initialLength);
 
             async.complete();
         });

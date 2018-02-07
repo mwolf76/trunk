@@ -21,33 +21,34 @@ public class MainVerticle extends AbstractVerticle {
     public void start(Future<Void> startFuture) throws Exception {
 
         List<AbstractVerticle> verticles = Arrays.asList(
-                new DataStoreVerticle(),
-                new WebServerVerticle());
+            new DataStoreVerticle(),
+            new WebServerVerticle(),
+            new UploadVerticle());
 
         AtomicInteger verticleCount = new AtomicInteger(verticles.size());
         JsonObject config = vertx.getOrCreateContext().config();
 
         verticles
-                .stream()
-                .forEach(verticle -> {
-                    vertx.deployVerticle(verticle, new DeploymentOptions()
-                            .setConfig(config), deployResponse -> {
-                        String simpleName = verticle.getClass().getSimpleName();
-                        if (deployResponse.failed()) {
-                            deployResponse.cause().printStackTrace();
-                            logger.error("Unable to deploy verticle {} (cause: {})",
-                                simpleName,
-                                    deployResponse.cause());
-                        } else {
-                            logger.info("{} deployed successfully", simpleName);
+            .stream()
+            .forEach(verticle -> {
+                vertx.deployVerticle(verticle, new DeploymentOptions()
+                                                   .setConfig(config), deployResponse -> {
+                    String simpleName = verticle.getClass().getSimpleName();
+                    if (deployResponse.failed()) {
+                        deployResponse.cause().printStackTrace();
+                        logger.error("Unable to deploy verticle {} (cause: {})",
+                            simpleName,
+                            deployResponse.cause());
+                    } else {
+                        logger.info("{} deployed successfully", simpleName);
 
-                            if (verticleCount.decrementAndGet() == 0) {
-                                logger.info("All verticles deployed and running. Ready to serve requests.");
-                                startFuture.complete();
-                            }
+                        if (verticleCount.decrementAndGet() == 0) {
+                            logger.info("All verticles deployed and running. Ready to serve requests.");
+                            startFuture.complete();
                         }
-                    });
+                    }
                 });
+            });
 
         Configuration configuration = new Configuration(config);
         logger.info(configuration);

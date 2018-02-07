@@ -61,33 +61,20 @@ final public class PostResourceRequestHandlerImpl extends BaseUserRequestHandler
                 DocumentContentResource documentContentResource =
                     (DocumentContentResource) resource;
 
-                Set<FileUpload> fileUploads = ctx.fileUploads();
-                fileUploads.stream().forEach(fu -> {
-                    logger.info("{} -> {} ({})", fu.fileName(), fu.uploadedFileName(), fu.size());
+                Pump pump = Pump.pump(request, documentContentResource.getWriteStream());
+
+                request.endHandler(event -> {
+                    logger.info("... incoming file transfer completed, {} bytes transferred.",
+                        ((PumpImpl) pump).getBytesPumped());
+
+                    documentContentResource.getCloseHandler()
+                        .handle(null);
                 });
 
-//                if (request.isEnded()) {
-//                    ctx.fail(new RuntimeException("Request is ended"));
-//                    return;
-//                }
-//
-//                /* setting up xfer */
-//                request.pause();
-//
-//                Pump pump = Pump.pump(request, documentContentResource.getWriteStream());
-//
-//                request.endHandler(event -> {
-//                    logger.info("... incoming file transfer completed, {} bytes transferred.",
-//                        ((PumpImpl) pump).getBytesPumped());
-//
-//                    documentContentResource.getCloseHandler()
-//                        .handle(null);
-//                });
-//
-//                logger.info("incoming file transfer started ...");
-//                pump.start();
-//
-//                request.resume();
+                logger.info("incoming file transfer started ...");
+                pump.start();
+
+                request.resume();
             }
         });
 

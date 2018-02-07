@@ -77,7 +77,7 @@ public class PumpImpl<T> implements Pump {
         dataHandler = data -> {
             Buffer buf = (Buffer) data;
 
-            logger.debug("writing {} bytes", buf.length());
+            // logger.debug("writing {} bytes", buf.length());
             writeStream.write(data);
             incPumped(buf);
 

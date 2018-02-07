@@ -56,5 +56,7 @@ abstract public class BaseUserRequestHandler implements Handler<RoutingContext> 
     public void handle(RoutingContext ctx) {
         logger.debug(MessageFormat.format("Invoking {0} ...", this.getClass().toString()));
         fetchDependencies(ctx);
+
+        // ctx.request().resume();
     }
 }

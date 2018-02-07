@@ -9,7 +9,7 @@ import io.vertx.core.logging.Logger;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.templ.TemplateEngine;
 
-public class ResponseBuilder {
+public final class ResponseBuilder {
 
     private TemplateEngine templateEngine;
     private Logger logger;

@@ -26,7 +26,7 @@ import java.text.MessageFormat;
 import static org.blackcat.trunk.conf.Keys.OAUTH2_PROVIDER_GOOGLE;
 import static org.blackcat.trunk.conf.Keys.OAUTH2_PROVIDER_KEYCLOAK;
 
-public class RequestHandler implements Handler<HttpServerRequest> {
+public final class RequestHandler implements Handler<HttpServerRequest> {
 
     private final String OAUTH2_CALLBACK_LOCATION = "/callback";
 
@@ -58,6 +58,12 @@ public class RequestHandler implements Handler<HttpServerRequest> {
     }
 
     private void setupMiddlewareHandlers() {
+        /* hack required to prevent request to be prematurely consumed when doing uploads */
+        router.postWithRegex("/protected/.*").handler(ctx -> {
+           ctx.request().pause();
+           ctx.next();
+        });
+
         // Add general refs to the ctx
         router.route().handler(ctx -> {
             ctx.put("vertx", vertx);

@@ -38,6 +38,8 @@ final public class GetResourceRequestHandlerImpl extends BaseUserRequestHandler 
     @Override
     public void handle(RoutingContext ctx) {
         super.handle(ctx);
+        ctx.request().resume();
+
         Path protectedPath = protectedPath(ctx);
 
         logger.info("Getting resource {} -> {}", ctx.request().path(), protectedPath);

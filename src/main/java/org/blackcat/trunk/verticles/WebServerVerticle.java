@@ -36,8 +36,10 @@ public class WebServerVerticle extends AbstractVerticle {
 
         HttpServerOptions httpServerOptions =
             new HttpServerOptions()
+                // .setUseAlpn(false); /* force using HTTP/1.1 */
                 // in vertx 2x 100-continues was activated per default, in vertx 3x it is off per default.
                 .setHandle100ContinueAutomatically(true);
+
 
         if (configuration.isSSLEnabled()) {
             String keystoreFilename = configuration.getKeystoreFilename();

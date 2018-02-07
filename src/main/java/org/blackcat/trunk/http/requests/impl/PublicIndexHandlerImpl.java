@@ -15,7 +15,6 @@ final public class PublicIndexHandlerImpl extends BaseUserRequestHandler impleme
     @Override
     public void handle(RoutingContext ctx) {
         super.handle(ctx);
-
         templateEngine.render(ctx, "templates/index", ar -> {
             if (ar.failed()) {
                 ctx.fail(ar.cause());
