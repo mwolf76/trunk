@@ -1,4 +1,4 @@
-package org.blackcat.trunk.http.requests.impl;
+package org.blackcat.trunk.http.requests.handlers.impl;
 
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;

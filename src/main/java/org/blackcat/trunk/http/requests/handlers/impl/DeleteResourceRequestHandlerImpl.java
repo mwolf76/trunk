@@ -1,9 +1,9 @@
-package org.blackcat.trunk.http.requests.impl;
+package org.blackcat.trunk.http.requests.handlers.impl;
 
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
-import org.blackcat.trunk.http.requests.PostResourceRequestHandler;
+import org.blackcat.trunk.http.requests.handlers.PostResourceRequestHandler;
 import org.blackcat.trunk.resource.impl.ErrorResource;
 
 import java.nio.file.Path;

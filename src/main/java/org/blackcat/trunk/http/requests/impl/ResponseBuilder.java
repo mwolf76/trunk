@@ -1,4 +1,4 @@
-package org.blackcat.trunk.http;
+package org.blackcat.trunk.http.requests.impl;
 
 import io.vertx.core.MultiMap;
 import io.vertx.core.buffer.Buffer;
@@ -8,8 +8,10 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.templ.TemplateEngine;
+import org.blackcat.trunk.http.Headers;
+import org.blackcat.trunk.http.StatusCode;
 
-public final class ResponseBuilder {
+final class ResponseBuilder {
 
     private TemplateEngine templateEngine;
     private Logger logger;

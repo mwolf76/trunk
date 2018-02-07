@@ -3,8 +3,6 @@ package org.blackcat.trunk.resource.impl;
 import io.vertx.core.Handler;
 import io.vertx.core.streams.ReadStream;
 import io.vertx.core.streams.WriteStream;
-import io.vertx.ext.web.RoutingContext;
-import org.blackcat.trunk.http.ResponseBuilder;
 
 public final class DocumentContentResource extends BaseResource {
 

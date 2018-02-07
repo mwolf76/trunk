@@ -1,4 +1,4 @@
-package org.blackcat.trunk.http.requests.impl;
+package org.blackcat.trunk.http.requests.handlers.impl;
 
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.json.JsonArray;

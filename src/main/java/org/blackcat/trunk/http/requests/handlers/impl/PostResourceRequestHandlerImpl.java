@@ -1,21 +1,19 @@
-package org.blackcat.trunk.http.requests.impl;
+package org.blackcat.trunk.http.requests.handlers.impl;
 
 import io.vertx.core.MultiMap;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.streams.Pump;
-import io.vertx.ext.web.FileUpload;
 import io.vertx.ext.web.RoutingContext;
 import org.blackcat.trunk.http.Headers;
-import org.blackcat.trunk.http.requests.PostResourceRequestHandler;
+import org.blackcat.trunk.http.requests.handlers.PostResourceRequestHandler;
 import org.blackcat.trunk.resource.impl.CollectionResource;
 import org.blackcat.trunk.resource.impl.DocumentContentResource;
 import org.blackcat.trunk.resource.impl.ErrorResource;
 import org.blackcat.trunk.streams.impl.PumpImpl;
 
 import java.nio.file.Path;
-import java.util.Set;
 
 import static org.blackcat.trunk.util.Utils.protectedPath;
 

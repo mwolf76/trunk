@@ -1,12 +1,11 @@
-package org.blackcat.trunk.http.requests.impl;
+package org.blackcat.trunk.http.requests.handlers.impl;
 
 import io.vertx.core.MultiMap;
-import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
 import org.blackcat.trunk.http.Headers;
-import org.blackcat.trunk.http.requests.PutResourceRequestHandler;
+import org.blackcat.trunk.http.requests.handlers.PutResourceRequestHandler;
 import org.blackcat.trunk.resource.impl.ErrorResource;
 
 import java.nio.file.Path;

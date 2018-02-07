@@ -1,8 +1,8 @@
-package org.blackcat.trunk.http.requests;
+package org.blackcat.trunk.http.requests.handlers;
 
 import io.vertx.core.Handler;
 import io.vertx.ext.web.RoutingContext;
-import org.blackcat.trunk.http.requests.impl.ProtectedIndexHandlerImpl;
+import org.blackcat.trunk.http.requests.handlers.impl.ProtectedIndexHandlerImpl;
 
 public interface ProtectedIndexHandler extends Handler<RoutingContext> {
     /**

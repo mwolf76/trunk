@@ -1,10 +1,9 @@
-package org.blackcat.trunk.http.requests.impl;
+package org.blackcat.trunk.http.requests.handlers.impl;
 
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
-import org.blackcat.trunk.http.ResponseBuilder;
-import org.blackcat.trunk.http.requests.ProtectedIndexHandler;
+import org.blackcat.trunk.http.requests.handlers.ProtectedIndexHandler;
 import org.blackcat.trunk.queries.Queries;
 
 final public class ProtectedIndexHandlerImpl extends BaseUserRequestHandler implements ProtectedIndexHandler {

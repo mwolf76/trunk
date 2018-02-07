@@ -1,4 +1,4 @@
-package org.blackcat.trunk.http.requests.impl;
+package org.blackcat.trunk.http.requests.handlers.impl;
 
 import com.mitchellbosecke.pebble.utils.Pair;
 import io.vertx.core.MultiMap;
@@ -10,7 +10,7 @@ import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.streams.Pump;
 import io.vertx.ext.web.RoutingContext;
 import org.blackcat.trunk.http.Headers;
-import org.blackcat.trunk.http.requests.GetResourceRequestHandler;
+import org.blackcat.trunk.http.requests.handlers.GetResourceRequestHandler;
 import org.blackcat.trunk.mappers.ShareMapper;
 import org.blackcat.trunk.queries.Queries;
 import org.blackcat.trunk.resource.Resource;

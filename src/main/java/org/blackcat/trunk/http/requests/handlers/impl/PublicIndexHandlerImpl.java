@@ -1,12 +1,11 @@
-package org.blackcat.trunk.http.requests.impl;
+package org.blackcat.trunk.http.requests.handlers.impl;
 
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
-import io.vertx.ext.web.templ.TemplateEngine;
 import org.blackcat.trunk.http.Headers;
-import org.blackcat.trunk.http.requests.PublicIndexHandler;
+import org.blackcat.trunk.http.requests.handlers.PublicIndexHandler;
 
 final public class PublicIndexHandlerImpl extends BaseUserRequestHandler implements PublicIndexHandler {
 

@@ -1,14 +1,10 @@
 package org.blackcat.trunk.resource.impl;
 
-import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
-import org.blackcat.trunk.http.ResponseBuilder;
 import org.blackcat.trunk.util.Utils;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
 
 final public class DocumentDescriptorResource extends BaseResource {
     @Override

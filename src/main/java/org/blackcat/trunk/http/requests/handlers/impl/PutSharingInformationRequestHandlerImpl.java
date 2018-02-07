@@ -1,8 +1,6 @@
-package org.blackcat.trunk.http.requests.impl;
+package org.blackcat.trunk.http.requests.handlers.impl;
 
 import io.vertx.core.Future;
-import io.vertx.core.Vertx;
-import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
@@ -11,10 +9,8 @@ import io.vertx.ext.auth.User;
 import io.vertx.ext.auth.oauth2.AccessToken;
 import io.vertx.ext.auth.oauth2.KeycloakHelper;
 import io.vertx.ext.web.RoutingContext;
-import org.blackcat.trunk.http.ResponseBuilder;
-import org.blackcat.trunk.http.requests.PutSharingInformationRequestHandler;
+import org.blackcat.trunk.http.requests.handlers.PutSharingInformationRequestHandler;
 import org.blackcat.trunk.queries.Queries;
-import org.blackcat.trunk.storage.Storage;
 
 import java.io.IOException;
 import java.nio.file.Path;

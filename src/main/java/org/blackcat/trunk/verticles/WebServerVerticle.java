@@ -8,15 +8,12 @@ package org.blackcat.trunk.verticles;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
-import io.vertx.core.Handler;
 import io.vertx.core.http.HttpServerOptions;
-import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.core.net.JksOptions;
-import io.vertx.ext.web.templ.PebbleTemplateEngine;
 import org.blackcat.trunk.conf.Configuration;
-import org.blackcat.trunk.http.RequestHandler;
+import org.blackcat.trunk.http.requests.impl.MainHandlerImpl;
 import org.blackcat.trunk.storage.Storage;
 import org.blackcat.trunk.storage.impl.FileSystemStorage;
 
@@ -55,7 +52,7 @@ public class WebServerVerticle extends AbstractVerticle {
 
         int httpPort = configuration.getHttpPort();
         vertx.createHttpServer(httpServerOptions)
-            .requestHandler(RequestHandler.create(vertx, configuration, storage))
+            .requestHandler(MainHandlerImpl.create(vertx, configuration, storage))
             .listen(httpPort, result -> {
                 if (result.succeeded()) {
                     logger.info("Web server is now ready to accept requests on port {}.", httpPort);

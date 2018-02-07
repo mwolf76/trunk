@@ -1,8 +1,6 @@
-package org.blackcat.trunk.http;
+package org.blackcat.trunk.http.requests.impl;
 
-import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
-import io.vertx.core.http.HttpMethod;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
@@ -18,7 +16,8 @@ import io.vertx.ext.web.templ.PebbleTemplateEngine;
 import io.vertx.ext.web.templ.TemplateEngine;
 import org.blackcat.trunk.conf.Configuration;
 import org.blackcat.trunk.http.middleware.UserInfoHandler;
-import org.blackcat.trunk.http.requests.*;
+import org.blackcat.trunk.http.requests.MainHandler;
+import org.blackcat.trunk.http.requests.handlers.*;
 import org.blackcat.trunk.storage.Storage;
 
 import java.text.MessageFormat;
@@ -26,7 +25,7 @@ import java.text.MessageFormat;
 import static org.blackcat.trunk.conf.Keys.OAUTH2_PROVIDER_GOOGLE;
 import static org.blackcat.trunk.conf.Keys.OAUTH2_PROVIDER_KEYCLOAK;
 
-public final class RequestHandler implements Handler<HttpServerRequest> {
+public final class MainHandlerImpl implements MainHandler {
 
     private final String OAUTH2_CALLBACK_LOCATION = "/callback";
 
@@ -34,14 +33,14 @@ public final class RequestHandler implements Handler<HttpServerRequest> {
     private final Vertx vertx;
     private final Router router;
     private final TemplateEngine templateEngine;
-    private final Logger logger = LoggerFactory.getLogger(RequestHandler.class);
+    private final Logger logger = LoggerFactory.getLogger(MainHandlerImpl.class);
 
     private final Storage storage;
     private final ResponseBuilder responseBuilder;
 
-    public RequestHandler(final Vertx vertx,
-                          final Configuration configuration,
-                          final Storage storage) {
+    public MainHandlerImpl(final Vertx vertx,
+                           final Configuration configuration,
+                           final Storage storage) {
 
         this.vertx = vertx;
         this.router = Router.router(vertx);
@@ -194,7 +193,7 @@ public final class RequestHandler implements Handler<HttpServerRequest> {
         router.accept(request);
     }
 
-    public static RequestHandler create(Vertx vertx, Configuration configuration, Storage storage) {
-        return new RequestHandler(vertx, configuration, storage);
+    public static MainHandlerImpl create(Vertx vertx, Configuration configuration, Storage storage) {
+        return new MainHandlerImpl(vertx, configuration, storage);
     }
 }
