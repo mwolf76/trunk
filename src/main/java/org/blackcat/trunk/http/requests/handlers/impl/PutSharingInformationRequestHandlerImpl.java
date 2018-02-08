@@ -97,7 +97,7 @@ final public class PutSharingInformationRequestHandlerImpl extends BaseUserReque
                         Future chainFuture = Future.future();
                         prevFuture.compose(v -> {
                             if (userMapper != null && collectionPath.startsWith(Paths.get(userMapper.getUuid()))) {
-                                Queries.findOrUpdateShareEntity(ctx.vertx(), userMapper, storage.getRoot().relativize(path), newAuthorizedUsers, ar -> {
+                                Queries.findUpdateShareEntity(ctx.vertx(), userMapper, storage.getRoot().relativize(path), newAuthorizedUsers, ar -> {
                                     if (ar.failed())
                                         chainFuture.fail(ar.cause());
                                     else

@@ -124,6 +124,7 @@ final public class GetResourceRequestHandlerImpl extends BaseUserRequestHandler 
                     responseBuilder.notFound(ctx);
                     return;
                 } else {
+                    logger.error("Unexpected resource type");
                     responseBuilder.internalServerError(ctx);
                     return;
                 }
@@ -201,7 +202,7 @@ final public class GetResourceRequestHandlerImpl extends BaseUserRequestHandler 
                     }
                     catch (IOException ioe) {
                         logger.error(ioe.toString());
-                        responseBuilder.internalServerError(ctx);
+                        ctx.fail(ioe);
                     }
                 }
 
@@ -280,7 +281,10 @@ final public class GetResourceRequestHandlerImpl extends BaseUserRequestHandler 
                                             .put("modified", documentDescriptorResource.getHumanLastModificationTime())
                                             .put("accessed", documentDescriptorResource.getHumanLastAccessedTime())
                                             .put("length", documentDescriptorResource.getHumanLength()));
-                        } else responseBuilder.internalServerError(ctx);
+                        } else {
+                            logger.error("Unexpected resource type");
+                            ctx.fail(new RuntimeException("Unexpected resource type"));
+                        }
                     }
 
                     final String body =

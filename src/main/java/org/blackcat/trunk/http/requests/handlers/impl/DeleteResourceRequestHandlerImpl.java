@@ -41,6 +41,7 @@ final public class DeleteResourceRequestHandlerImpl extends BaseUserRequestHandl
                 }
             }
 
+            logger.error("Unexpected error resource type");
             responseBuilder.internalServerError(ctx);
         });
     }

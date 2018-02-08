@@ -179,8 +179,6 @@ public class AsyncInputStream implements ReadStream<Buffer> {
                         // We are done, no more data to be expected
                         this.handleEnd();
                     } else {
-                        logger.debug("Read {} bytes", bytesRead);
-
                         buff.flip();
                         final Buffer vBuffer = Buffer.buffer(buff.limit());
                         vBuffer.setBytes(0, buff);

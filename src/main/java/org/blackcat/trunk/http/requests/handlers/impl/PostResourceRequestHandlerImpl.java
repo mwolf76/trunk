@@ -43,7 +43,8 @@ final public class PostResourceRequestHandlerImpl extends BaseUserRequestHandler
                 else if (errorResource.isInvalid()) {
                     responseBuilder.conflict(ctx, errorResource.getMessage());
                 } else {
-                    responseBuilder.internalServerError(ctx);
+                    logger.error("Error resource should either be unit or invalid");
+                    ctx.fail(new RuntimeException("Invalid state"));
                 }
             }
 

@@ -47,8 +47,8 @@ final public class Queries {
      * @param authorizedUsers
      * @param handler
      */
-    static public void findOrUpdateShareEntity(Vertx vertx, UserMapper owner, Path collectionPath,
-                                               List<String> authorizedUsers, Handler<AsyncResult<ShareMapper>> handler) {
+    static public void findUpdateShareEntity(Vertx vertx, UserMapper owner, Path collectionPath,
+                                             List<String> authorizedUsers, Handler<AsyncResult<ShareMapper>> handler) {
 
         JsonObject query = new JsonObject()
                                .put("type", QueryType.FIND_UPDATE_SHARE.getTag())

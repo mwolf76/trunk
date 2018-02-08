@@ -22,8 +22,7 @@ public class MainVerticle extends AbstractVerticle {
 
         List<AbstractVerticle> verticles = Arrays.asList(
             new DataStoreVerticle(),
-            new WebServerVerticle(),
-            new UploadVerticle());
+            new WebServerVerticle());
 
         AtomicInteger verticleCount = new AtomicInteger(verticles.size());
         JsonObject config = vertx.getOrCreateContext().config();

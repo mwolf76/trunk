@@ -21,7 +21,7 @@ import java.util.UUID;
 
 final public class DataStoreVerticle extends AbstractVerticle {
 
-    private Logger logger;
+    private Logger logger = LoggerFactory.getLogger(DataStoreVerticle.class);
     private MongoDataStore mongoDataStore;
 
     public static final int ERR_COULD_NOT_CREATE_USER  = 1;
@@ -31,8 +31,6 @@ final public class DataStoreVerticle extends AbstractVerticle {
 
     @Override
     public void start(Future<Void> startFuture) {
-        initLogger();
-
         Context context = vertx.getOrCreateContext();
 
         Configuration configuration = new Configuration(context.config());
@@ -56,10 +54,6 @@ final public class DataStoreVerticle extends AbstractVerticle {
                 startFuture.complete();
             }
         });
-    }
-
-    private void initLogger() {
-        logger = LoggerFactory.getLogger(DataStoreVerticle.class);
     }
 
     private void setupMessageHandlers() {
