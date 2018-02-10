@@ -6,7 +6,6 @@ import io.vertx.core.Vertx;
 import io.vertx.core.file.*;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
-import org.blackcat.trunk.mappers.UserMapper;
 import org.blackcat.trunk.resource.Resource;
 import org.blackcat.trunk.resource.impl.CollectionResource;
 import org.blackcat.trunk.resource.impl.DocumentContentResource;
@@ -19,7 +18,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.text.MessageFormat;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -42,48 +40,8 @@ public class FileSystemStorage implements Storage {
     }
 
     @Override
-    public void checkUserDirectory(UserMapper userMapper, Handler<Void> handler) {
-
-        /* local ref to the filesystem object */
-        FileSystem fileSystem = vertx.fileSystem();
-
-        Path userDirectoryPath = root.resolve(Paths.get(userMapper.getUuid()));
-        String userDirectoryPathString = userDirectoryPath.toString();
-        fileSystem.exists(userDirectoryPathString, existsAsyncResult -> {
-            Boolean exists = existsAsyncResult.result();
-            if (exists) {
-                fileSystem.props(userDirectoryPathString, filePropsAsyncResult -> {
-                    FileProps fileProperties = filePropsAsyncResult.result();
-
-                    /* Directory? */
-                    if (fileProperties.isDirectory()) {
-                        handler.handle(null); /* all good */
-                    } else {
-                        throw new FileSystemException(MessageFormat.format(
-                            "Path {0} already exists and it's not a directory.",
-                            userDirectoryPath
-                        ));
-                    }
-                });
-            } else {
-                fileSystem.mkdir(userDirectoryPathString, mkdirDirAsyncResult -> {
-                    if (mkdirDirAsyncResult.succeeded())
-                        handler.handle(null); /* all good */
-                    else {
-                        throw new FileSystemException(MessageFormat.format(
-                            "Could not make directory {0} for user {1}.",
-                            userDirectoryPath, userMapper.getEmail()));
-                    }
-                });
-            }
-        });
-    }
-
-    @Override
-    public FileProps pathProperties(Path path) throws IOException {
-        /* local ref to the filesystem object */
-        FileSystem fileSystem = vertx.fileSystem();
-        return fileSystem.propsBlocking(path.toString());
+    public FileProps resourceProperties(Path path) throws IOException {
+        return vertx.fileSystem().propsBlocking(path.toString());
     }
 
     @Override
@@ -92,7 +50,7 @@ public class FileSystemStorage implements Storage {
     }
 
     @Override
-    public void get(Path path, String etag, Handler<Resource> resourceHandler) {
+    public void get(Path path, Handler<Resource> resourceHandler) {
 
         /* local ref to the filesystem object */
         FileSystem fileSystem = vertx.fileSystem();
@@ -238,7 +196,7 @@ public class FileSystemStorage implements Storage {
     }
 
     @Override
-    public void putCollection(Path path, String etag, Handler<Resource> resourceHandler) {
+    public void putCollectionResource(Path path, Handler<Resource> resourceHandler) {
 
         /* local ref to the filesystem object */
         FileSystem fileSystem = vertx.fileSystem();
@@ -285,10 +243,10 @@ public class FileSystemStorage implements Storage {
                 });
             }
         });
-    } /* putCollection() */
+    } /* putCollectionResource() */
 
     @Override
-    public void putDocument(Path path, String etag, Handler<Resource> resourceHandler) {
+    public void putDocumentResource(Path path, Handler<Resource> resourceHandler) {
 
         /* local ref to the filesystem object */
         FileSystem fileSystem = vertx.fileSystem();
@@ -342,7 +300,7 @@ public class FileSystemStorage implements Storage {
                 });
             }
         });
-    } /* putDocument() */
+    } /* putDocumentResource() */
 
     private void putDocumentHelper(final Path fullPath, final Handler<Resource> handler,
                                    final Handler<Void> completionHandler) {

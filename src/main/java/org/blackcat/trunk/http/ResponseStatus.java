@@ -4,22 +4,24 @@ package org.blackcat.trunk.http;
  * Enum for HTTP status codes
  */
 
-public enum StatusCode {
+public enum ResponseStatus {
     OK(200, "OK"),
+
     FOUND(302, "Found"),
-    NOT_MODIFIED(304, "Not Modified"),
+
     BAD_REQUEST(400, "Bad Request"),
     FORBIDDEN(403, "Forbidden"),
     NOT_FOUND(404, "Not Found"),
     METHOD_NOT_ALLOWED(405, "Method Not Allowed"),
     NOT_ACCEPTABLE(406, "Not Acceptable"),
-    INTERNAL_SERVER_ERROR(500, "Internal Server Error"),
-    CONFLICT(409, "Conflict");
+    CONFLICT(409, "Conflict"),
+
+    INTERNAL_SERVER_ERROR(500, "Internal Server Error");
 
     private final int statusCode;
     private final String statusMessage;
 
-    StatusCode(int statusCode, String statusMessage) {
+    ResponseStatus(int statusCode, String statusMessage) {
         this.statusCode = statusCode;
         this.statusMessage = statusMessage;
     }

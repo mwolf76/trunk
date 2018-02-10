@@ -1,22 +1,18 @@
 package org.blackcat.trunk.http.requests.handlers.impl;
 
 import io.vertx.core.Future;
-import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
-import io.vertx.ext.auth.User;
-import io.vertx.ext.auth.oauth2.AccessToken;
-import io.vertx.ext.auth.oauth2.KeycloakHelper;
 import io.vertx.ext.web.RoutingContext;
 import org.blackcat.trunk.http.requests.handlers.PutSharingInformationRequestHandler;
+import org.blackcat.trunk.http.requests.response.ResponseUtils;
 import org.blackcat.trunk.mappers.UserMapper;
 import org.blackcat.trunk.queries.Queries;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -33,91 +29,114 @@ final public class PutSharingInformationRequestHandlerImpl extends BaseUserReque
     public void handle(RoutingContext ctx) {
         super.handle(ctx);
 
-        String requestPathString = urlDecode(ctx.request().path());
-        Path requestPath = Paths.get(requestPathString);
+        if (ctx.get("requestType").equals(RequestType.HTML))
+            jsonResponseBuilder.badRequest(ctx);
 
-        Path topLevelPath = Paths.get("/share");
-        Path collectionPath = topLevelPath.relativize(requestPath);
-
-        JsonObject json = ctx.getBodyAsJson();
-        if (json == null) {
-            responseBuilder.badRequest(ctx);
-            return;
-        }
-
-        /* TODO: review this */
-        JsonArray authorizedUsers = null;
-        try {
-            authorizedUsers = json.getJsonArray("authorizedUsers");
-        } catch (ClassCastException cce) {
-        }
-        List<String> newAuthorizedUsers = new ArrayList<>();
-        for (Object o : authorizedUsers) {
-            if (o instanceof String) {
-                String email = (String) o;
-                if (email.equals("*") || isValidEmail(email)) {
-                    newAuthorizedUsers.add(email);
+        else if (isValidRequestBody(ctx)) {
+            Path collectionPath = collectionPath(ctx);
+            Queries.findCreateUserEntityByEmail(ctx.vertx(), ctx.get("email"), userMapperAsyncResult -> {
+                if (userMapperAsyncResult.failed())
+                    ctx.fail(userMapperAsyncResult.cause());
+                else {
+                    UserMapper userMapper = userMapperAsyncResult.result();
+                    if (userOwnsThisCollection(userMapper, collectionPath)) {
+                        asyncRewriteCollectionShareInfo(ctx, collectionPath, userMapper);
+                    } else jsonResponseBuilder.methodNotAllowed(ctx);
                 }
-            }
+            });
+        } else {
+            logger.warn("Bad request (invalid request body) {}", ctx.request().uri());
+            jsonResponseBuilder.badRequest(ctx);
         }
+    }
 
-        User User = ctx.user();
-        AccessToken at = (AccessToken) User;
-
-        JsonObject idToken = KeycloakHelper.idToken(at.principal());
-        String email = idToken.getString("email");
-
-        Queries.findCreateUserEntityByEmail(ctx.vertx(), email, userMapperAsyncResult -> {
-            if (userMapperAsyncResult.failed())
-                ctx.fail(userMapperAsyncResult.cause());
-            else {
-                UserMapper userMapper = userMapperAsyncResult.result();
-
-                vertx.executeBlocking(future -> {
-                    try (Stream<Path> pathStream = storage.streamDirectory(storage.getRoot().resolve(collectionPath))) {
-                        future.complete(pathStream.collect(Collectors.toList()));
-                    } catch (IOException ioe) {
-                        ioe.printStackTrace();
-                    }
-                }, res -> {
-                    final List<Path> paths = (List<Path>) res.result();
-                    if (paths == null) {
-                        responseBuilder.internalServerError(ctx);
-                        return;
-                    }
-
-                    /* first link of the chain */
-                    Future<Void> initFuture = Future.future(event -> {
-                        logger.info("Started updating share permissions, owner is {}.", userMapper.getEmail());
-                        responseBuilder.done(ctx); /* return control to the user, process will continue in background */
-                    });
-                    Future<Void> prevFuture = initFuture;
-
-                    for (Path path : paths) {
-                        Future chainFuture = Future.future();
-                        prevFuture.compose(v -> {
-                            if (userMapper != null && collectionPath.startsWith(Paths.get(userMapper.getUuid()))) {
-                                Queries.findUpdateShareEntity(ctx.vertx(), userMapper, storage.getRoot().relativize(path), newAuthorizedUsers, ar -> {
-                                    if (ar.failed())
-                                        chainFuture.fail(ar.cause());
-                                    else
-                                        chainFuture.complete();
-                                });
-                            } else {
-                                chainFuture.fail("No bloody way!");
-                            }
-                        }, chainFuture);
-
-                        prevFuture = chainFuture;
-                    }
-                    prevFuture.compose(v -> {
-                        logger.info("Done updating share permissions ({} entries processed).", paths.size());
-                    }, initFuture);
-
-                    /* let's get this thing started ... */
-                    initFuture.complete();
-                });
+    private void asyncRewriteCollectionShareInfo(RoutingContext ctx, Path collectionPath, UserMapper userMapper) {
+        vertx.<List<Path>> executeBlocking(future -> {
+            try (Stream<Path> pathStream = storage.streamDirectory(storage.getRoot().resolve(collectionPath))) {
+                future.complete(pathStream.collect(Collectors.toList()));
+            } catch (IOException ioe) {
+                future.fail(ioe);
+            }
+        }, asyncResult -> {
+            if (asyncResult.failed()) {
+                ctx.fail(asyncResult.cause());
+            } else {
+                setupRewriteTaskChain(ctx, userMapper, newAuthorizedUsers(ctx), asyncResult.result());
             }
         });
+    }
+
+    private boolean isValidRequestBody(RoutingContext ctx) {
+        JsonObject json = ctx.getBodyAsJson();
+        if (json == null) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private boolean userOwnsThisCollection(UserMapper userMapper, Path collectionPath) {
+        return collectionPath.startsWith(Paths.get(userMapper.getUuid()));
+    }
+
+    private Path collectionPath(RoutingContext ctx) {
+        Path requestPath = Paths.get(urlDecode(ctx.request().path()));
+        Path topLevelPath = Paths.get("/share");
+        return topLevelPath.relativize(requestPath);
+    }
+
+    private void setupRewriteTaskChain(RoutingContext ctx, UserMapper userMapper,
+                                       List<String> newAuthorizedUsers, List<Path> paths) {
+
+        /* first link of the chain */
+        Future<Void> initFuture = Future.future(invoked -> {
+            logger.info("Started updating share permissions, owner is {}.", userMapper.getEmail());
+            ResponseUtils.complete(ctx); /* return control to the user, process will continue in background */
+        });
+
+        /* put together intermediate links of the chain (actual tasks) */
+        Future<Void> prevFuture = initFuture;
+        for (Path path : paths) {
+            Future chainFuture = Future.<Void> future();
+            rewriteTask(ctx, userMapper, path, newAuthorizedUsers, prevFuture, chainFuture);
+            prevFuture = chainFuture;
+        }
+
+        /* last link of the chain */
+        prevFuture.compose(invoked -> {
+            logger.info("Done updating share permissions ({} entries processed).", paths.size());
+        }, initFuture);
+
+        /* let's get this thing started ... */
+        initFuture.complete();
+    }
+
+    private Future rewriteTask(RoutingContext ctx, UserMapper userMapper,
+                               Path path, List<String> newAuthorizedUsers,
+                               Future<Void> prevFuture, Future chainFuture) {
+        return prevFuture.compose(invoked -> {
+            Queries.findUpdateShareEntity(ctx.vertx(), userMapper,
+                relativePath(path), newAuthorizedUsers, ar -> {
+                    if (ar.failed()) {
+                        logger.error("Failed to rewrite sharing information for {}", path);
+                        chainFuture.fail(ar.cause());
+                    } else {
+                        logger.debug("Rewrote sharing information for {}", path);
+                        chainFuture.complete();
+                    }
+                });
+        }, chainFuture);
+    }
+
+    private Path relativePath(Path path) {
+        return storage.getRoot().relativize(path);
+    }
+
+    private List<String> newAuthorizedUsers(RoutingContext ctx) {
+        return ctx.getBodyAsJson().getJsonArray("authorizedUsers").stream()
+            .filter(o -> o instanceof String)
+            .map(String::valueOf)
+            .filter(s -> "*".equals(s) || isValidEmail(s))
+            .collect(Collectors.toList());
     }
 }

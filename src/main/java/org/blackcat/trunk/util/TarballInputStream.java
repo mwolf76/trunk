@@ -9,14 +9,14 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class TarballInputStream extends InputStream {
 
-    private PipedInputStream in;
-    private TarOutputStream out;
+    private final Storage storage;
+    private final PipedInputStream in;
+    private final TarOutputStream out;
 
     private boolean canceled;
 
@@ -31,21 +31,16 @@ public class TarballInputStream extends InputStream {
     private static final Logger logger = LoggerFactory.getLogger(AsyncInputStream.class);
 
     public TarballInputStream(Storage storage, Path collectionPath) throws IOException {
-        in = new PipedInputStream();
-        out = new TarOutputStream(new PipedOutputStream(in));
-        canceled = false;
+        this.in = new PipedInputStream();
+        this.out = new TarOutputStream(new PipedOutputStream(in));
+        this.storage = storage;
+        this.canceled = false;
 
         new Thread(() -> {
 
             List<Path> entries;
             try (Stream<Path> pathStream = storage.streamDirectory(storage.getRoot().resolve(collectionPath))) {
-                entries = pathStream.filter(path -> {
-                    try {
-                        return storage.pathProperties(path).isRegularFile();
-                    } catch (IOException ioe) {
-                        return false;
-                    }
-                }).collect(Collectors.toList());
+                entries = pathStream.filter(this::isRegularFile).collect(Collectors.toList());
             } catch (IOException ioe) {
                 throw new RuntimeException("An error occurred while collecting entries for the archive.");
             }
@@ -89,6 +84,14 @@ public class TarballInputStream extends InputStream {
                 throw new RuntimeException(ioe);
             }
         }).start();
+    }
+
+    private boolean isRegularFile(Path path) {
+        try {
+            return storage.resourceProperties(path).isRegularFile();
+        } catch (IOException ioe) {
+            return false;
+        }
     }
 
     @Override

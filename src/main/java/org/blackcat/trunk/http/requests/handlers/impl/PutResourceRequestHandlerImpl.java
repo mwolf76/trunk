@@ -1,6 +1,7 @@
 package org.blackcat.trunk.http.requests.handlers.impl;
 
 import io.vertx.core.MultiMap;
+import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
@@ -20,26 +21,34 @@ final public class PutResourceRequestHandlerImpl extends BaseUserRequestHandler 
     public void handle(RoutingContext ctx) {
         super.handle(ctx);
 
-        Path protectedPath = protectedPath(ctx);
+        if (ctx.get("requestType").equals(RequestType.HTML))
+            jsonResponseBuilder.badRequest(ctx);
 
-        MultiMap headers = ctx.request().headers();
-        String etag = headers.get(Headers.IF_NONE_MATCH_HEADER);
+        else {
+            Path protectedPath = protectedPath(ctx);
 
-        Path resolvedPath = storage.getRoot().resolve(protectedPath);
-        logger.trace("PUT {} -> {} [etag = {}]", protectedPath, resolvedPath, etag);
+            MultiMap headers = ctx.request().headers();
+            String etag = headers.get(Headers.IF_NONE_MATCH_HEADER);
 
-        storage.putCollection(resolvedPath, etag, resource -> {
-            if (resource instanceof ErrorResource) {
-                ErrorResource errorResource = (ErrorResource) resource;
-                if (errorResource.isUnit()) {
-                    responseBuilder.ok(ctx);
-                } else if (errorResource.isInvalid()) {
-                    responseBuilder.conflict(ctx, errorResource.getMessage());
-                } else {
-                    responseBuilder.internalServerError(ctx);
+            Path resolvedPath = storage.getRoot().resolve(protectedPath);
+            logger.trace("PUT {} -> {} [etag = {}]", protectedPath, resolvedPath, etag);
+
+            storage.putCollectionResource(resolvedPath, resource -> {
+                if (resource instanceof ErrorResource) {
+                    ErrorResource errorResource = (ErrorResource) resource;
+                    if (errorResource.isUnit()) {
+                        logger.debug("Ok: {}", ctx.request().uri());
+                        jsonResponseBuilder.success(ctx, new JsonObject());
+                    } else if (errorResource.isInvalid()) {
+                        logger.debug("INVALID: {}", ctx.request().uri());
+                        jsonResponseBuilder.conflict(ctx);
+                    } else {
+                        logger.debug("UNEXPECTED: {}", ctx.request().uri());
+                        ctx.fail(new BaseUserRequestException("Unexpected error"));
+                    }
+                    return;
                 }
-                return;
-            }
-        });
+            });
+        }
     }
 }

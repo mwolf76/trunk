@@ -1,13 +1,16 @@
 package org.blackcat.trunk.http.requests.handlers.impl;
 
 import io.vertx.core.Handler;
+import io.vertx.core.MultiMap;
 import io.vertx.core.Vertx;
+import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
-import io.vertx.ext.web.templ.TemplateEngine;
 import org.blackcat.trunk.conf.Configuration;
-import org.blackcat.trunk.http.requests.impl.ResponseBuilder;
+import org.blackcat.trunk.http.Headers;
+import org.blackcat.trunk.http.requests.response.impl.HtmlResponseBuilderImpl;
+import org.blackcat.trunk.http.requests.response.impl.JsonResponseBuilderImpl;
 import org.blackcat.trunk.storage.Storage;
 
 import java.text.MessageFormat;
@@ -18,12 +21,12 @@ abstract public class BaseUserRequestHandler implements Handler<RoutingContext> 
     protected Vertx vertx;
     protected Storage storage;
     protected Configuration configuration;
-    protected TemplateEngine templateEngine;
-    protected ResponseBuilder responseBuilder;
+    protected JsonResponseBuilderImpl jsonResponseBuilder;
+    protected HtmlResponseBuilderImpl htmlResponseBuilder;
 
     final private Logger logger = LoggerFactory.getLogger(BaseUserRequestHandler.class);
 
-    private void fetchDependencies(RoutingContext ctx) {
+    private void preprocess(RoutingContext ctx) {
 
         vertx = ctx.get("vertx");
         if (vertx == null) {
@@ -40,20 +43,30 @@ abstract public class BaseUserRequestHandler implements Handler<RoutingContext> 
             ctx.fail(new BaseUserRequestException("configuration == null"));
         }
 
-        templateEngine = ctx.get("templateEngine");
-        if (templateEngine == null) {
-            ctx.fail(new BaseUserRequestException("templateEngine == null"));
+        jsonResponseBuilder = ctx.get("jsonResponseBuilder");
+        if (jsonResponseBuilder == null) {
+            ctx.fail(new BaseUserRequestException("jsonResponseBuilder == null"));
         }
 
-        responseBuilder = ctx.get("responseBuilder");
-        if (responseBuilder == null) {
-            ctx.fail(new BaseUserRequestException("responseBuilder == null"));
+        htmlResponseBuilder = ctx.get("htmlResponseBuilder");
+        if (htmlResponseBuilder == null) {
+            ctx.fail(new BaseUserRequestException("htmlResponseBuilder == null"));
         }
+        
+        ctx.put("requestType", doesAcceptJson(ctx) ? RequestType.JSON : RequestType.HTML);
+    }
+
+    private boolean doesAcceptJson(RoutingContext ctx) {
+        HttpServerRequest request = ctx.request();
+        MultiMap headers = request.headers();
+        String accept = headers.get(Headers.ACCEPT_HEADER);
+
+        return (accept != null && accept.contains("application/json"));
     }
 
     @Override
     public void handle(RoutingContext ctx) {
         logger.debug(MessageFormat.format("Invoking {0} ...", this.getClass().toString()));
-        fetchDependencies(ctx);
+        preprocess(ctx);
     }
 }

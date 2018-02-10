@@ -5,6 +5,7 @@ import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.auth.oauth2.AccessToken;
 import io.vertx.ext.web.RoutingContext;
 import org.blackcat.trunk.http.middleware.UserInfoHandler;
+import org.blackcat.trunk.http.requests.response.ResponseUtils;
 
 final public class LogoutHandlerImpl extends BaseUserRequestHandler implements UserInfoHandler {
 
@@ -32,7 +33,7 @@ final public class LogoutHandlerImpl extends BaseUserRequestHandler implements U
         String email = ctx.get("email");
 
         ctx.session().destroy();
-        logger.info("Logged out user {}", email);
-        responseBuilder.found(ctx, "/");
+        logger.info("Logged out user {}. Redirecting to / ...", email);
+        ResponseUtils.found(ctx, "/");
     }
 }

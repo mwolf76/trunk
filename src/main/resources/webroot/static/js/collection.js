@@ -130,6 +130,10 @@ function deleteResource(resource, successCallback, errorCallback) {
     console.log('Deleting resource: ' + resource);
     $.ajax({
         type: "DELETE",
+        dataType: "json",
+        accepts: {
+            json: "application/json"
+        },
         url: resource,
         success: successCallback,
         error: errorCallback || defaultErrorCallback
@@ -151,6 +155,10 @@ function postResource(resource, resourceName, successCallback, errorCallback) {
     console.log('Uploading document: ' + resource);
     $.ajax({
         type: 'POST',
+        dataType: "json",
+        accepts: {
+            json: "application/json"
+        },
         url: resourceName,
         contentType: "multipart/form-data",
         processData: false,
@@ -165,6 +173,10 @@ function putResource(resource, successCallback, errorCallback) {
     console.log('Creating collection: ', resource);
     $.ajax({
         type: "PUT",
+        dataType: "json",
+        accepts: {
+            json: "application/json"
+        },
         url: resource,
         success: successCallback,
         error: errorCallback || defaultErrorCallback

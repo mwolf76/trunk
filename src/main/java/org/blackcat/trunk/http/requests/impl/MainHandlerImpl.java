@@ -13,11 +13,12 @@ import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.*;
 import io.vertx.ext.web.sstore.LocalSessionStore;
 import io.vertx.ext.web.templ.PebbleTemplateEngine;
-import io.vertx.ext.web.templ.TemplateEngine;
 import org.blackcat.trunk.conf.Configuration;
 import org.blackcat.trunk.http.middleware.UserInfoHandler;
 import org.blackcat.trunk.http.requests.MainHandler;
 import org.blackcat.trunk.http.requests.handlers.*;
+import org.blackcat.trunk.http.requests.response.impl.HtmlResponseBuilderImpl;
+import org.blackcat.trunk.http.requests.response.impl.JsonResponseBuilderImpl;
 import org.blackcat.trunk.storage.Storage;
 
 import java.text.MessageFormat;
@@ -28,15 +29,15 @@ import static org.blackcat.trunk.conf.Keys.OAUTH2_PROVIDER_KEYCLOAK;
 public final class MainHandlerImpl implements MainHandler {
 
     private final String OAUTH2_CALLBACK_LOCATION = "/callback";
+    private final Logger logger = LoggerFactory.getLogger(MainHandlerImpl.class);
 
     private final Configuration configuration;
     private final Vertx vertx;
     private final Router router;
-    private final TemplateEngine templateEngine;
-    private final Logger logger = LoggerFactory.getLogger(MainHandlerImpl.class);
-
     private final Storage storage;
-    private final ResponseBuilder responseBuilder;
+
+    private final HtmlResponseBuilderImpl htmlResponseBuilder;
+    private final JsonResponseBuilderImpl jsonResponseBuilder;
 
     public MainHandlerImpl(final Vertx vertx,
                            final Configuration configuration,
@@ -44,10 +45,11 @@ public final class MainHandlerImpl implements MainHandler {
 
         this.vertx = vertx;
         this.router = Router.router(vertx);
-        this.templateEngine = PebbleTemplateEngine.create(vertx);
         this.configuration = configuration;
         this.storage = storage;
-        this.responseBuilder = new ResponseBuilder(templateEngine, logger);
+
+        this.htmlResponseBuilder = new HtmlResponseBuilderImpl(PebbleTemplateEngine.create(vertx));
+        this.jsonResponseBuilder = new JsonResponseBuilderImpl();
 
         setupMiddlewareHandlers();
         setupOAuth2Handlers();
@@ -57,19 +59,30 @@ public final class MainHandlerImpl implements MainHandler {
     }
 
     private void setupMiddlewareHandlers() {
+
+        final String vertxKey = "vertx";
+        final String storageKey = "storage";
+        final String configurationKey = "configuration";
+        final String jsonResponseBuilderKey = "jsonResponseBuilder";
+        final String htmlResponseBuilderKey = "htmlResponseBuilder";
+
         /* hack required to prevent request to be prematurely consumed when doing uploads */
         router.postWithRegex("/protected/.*").handler(ctx -> {
-           ctx.request().pause();
-           ctx.next();
+            ctx.request().pause();
+            ctx.next();
         });
 
-        // Add general refs to the ctx
+        // Initial routing ctx setup
         router.route().handler(ctx -> {
-            ctx.put("vertx", vertx);
-            ctx.put("storage", storage);
-            ctx.put("configuration", configuration);
-            ctx.put("templateEngine", templateEngine);
-            ctx.put("responseBuilder", responseBuilder);
+            // Add general refs to the ctx
+            ctx.put( vertxKey, vertx);
+            ctx.put( storageKey, storage);
+            ctx.put( configurationKey, configuration);
+
+            // it's up to the request handler to decider whether to use one or the other
+            ctx.put(jsonResponseBuilderKey, jsonResponseBuilder);
+            ctx.put(htmlResponseBuilderKey, htmlResponseBuilder);
+
             ctx.next();
         });
 
@@ -77,7 +90,7 @@ public final class MainHandlerImpl implements MainHandler {
         router.route().handler(CookieHandler.create());
 
         SessionHandler sessionHandler = SessionHandler.create(LocalSessionStore.create(vertx))
-            .setCookieHttpOnlyFlag(true);
+                                            .setCookieHttpOnlyFlag(true);
 
         if (configuration.isSSLEnabled()) {
             // avoid reading, sniffing hijacking or tampering your sessions (requires SSL)
@@ -91,18 +104,22 @@ public final class MainHandlerImpl implements MainHandler {
     private void setupErrorHandlers() {
         /* invalid URL */
         router.getWithRegex(".*")
-            .handler(responseBuilder::notFound);
+            .handler(htmlResponseBuilder::notFound);
 
         /* invalid method */
         router.routeWithRegex(".*")
-            .handler(responseBuilder::notAllowed);
+            .handler(htmlResponseBuilder::methodNotAllowed);
 
         /* errors */
         router.route()
-            .failureHandler(responseBuilder::internalServerError);
+            .failureHandler(htmlResponseBuilder::internalServerError);
     }
 
     private void setupProtectedHandlers() {
+        /* An extra handler to fetch user info into context */
+        UserInfoHandler userInfoHandler = UserInfoHandler.create();
+        router.routeWithRegex("/protected/.*").handler(userInfoHandler);
+
         router.get("/protected/main")
             .handler(ProtectedIndexHandler.create());
 
@@ -114,6 +131,9 @@ public final class MainHandlerImpl implements MainHandler {
 
         router.putWithRegex("/share/.*")
             .handler(BodyHandler.create());
+
+        router.routeWithRegex("/share/.*")
+            .handler(userInfoHandler);
 
         router.putWithRegex("/share/.*")
             .handler(PutSharingInformationRequestHandler.create());
@@ -142,7 +162,7 @@ public final class MainHandlerImpl implements MainHandler {
     }
 
     private void setupOAuth2Handlers() {
-        OAuth2Auth authProvider = null;
+        OAuth2Auth authProvider;
         final String oauth2ProviderName = configuration.getOauth2Provider();
 
         if (oauth2ProviderName.equals(OAUTH2_PROVIDER_GOOGLE)) {
@@ -150,11 +170,12 @@ public final class MainHandlerImpl implements MainHandler {
                 configuration.getOauth2ClientID(),
                 configuration.getOauth2ClientSecret());
         } else if (oauth2ProviderName.equals(OAUTH2_PROVIDER_KEYCLOAK)) {
-            logger.info(buildKeyCloakConfiguration().encodePrettily());
-            authProvider = KeycloakAuth.create(vertx, OAuth2FlowType.AUTH_CODE, buildKeyCloakConfiguration());
+            authProvider = KeycloakAuth.create(vertx,
+                OAuth2FlowType.AUTH_CODE,
+                buildKeyCloakConfiguration());
         } else {
             throw new RuntimeException(
-                    MessageFormat.format("Unsupported OAuth2 provider: {0}", oauth2ProviderName));
+                MessageFormat.format("Unsupported OAuth2 provider: {0}", oauth2ProviderName));
         }
 
         // FIXME: 2/3/18 This sucks!
@@ -172,9 +193,7 @@ public final class MainHandlerImpl implements MainHandler {
         /* Keep protected contents under oauth2 */
         authHandler.setupCallback(router.get(OAUTH2_CALLBACK_LOCATION));
         router.routeWithRegex("/protected/.*").handler(authHandler);
-
-        /* An extra handler to fetch user info into context */
-        router.routeWithRegex("/protected/.*").handler(UserInfoHandler.create());
+        router.routeWithRegex("/share/.*").handler(authHandler);
     }
 
     private JsonObject buildKeyCloakConfiguration() {

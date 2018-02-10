@@ -42,7 +42,7 @@ final public class UserInfoHandlerImpl implements UserInfoHandler {
             } else {
                 JsonObject principal = accessToken.principal();
                 String email = principal.getString("email");
-                logger.info("User data: {}", principal.toString());
+                logger.trace("User data: {}", principal.toString());
 
                 ctx.put("email", email);
                 ctx.next();

@@ -46,10 +46,9 @@ final public class DataStoreVerticle extends AbstractVerticle {
         MongoClient mongoClient = MongoClient.createShared(vertx, mongoConfig);
         mongoDataStore = new MongoDataStore(vertx, mongoClient, mongoConfig);
 
-        /* this query is only used to determine if mongo server is alive and well... */
+        /* determine if mongo is alive and well... */
         mongoClient.getCollections(ar -> {
             if (ar.succeeded()) {
-                List<String> result = ar.result();
                 setupMessageHandlers();
                 startFuture.complete();
             }
@@ -118,12 +117,11 @@ final public class DataStoreVerticle extends AbstractVerticle {
                             handler.handle(Future.failedFuture(cause));
                         } else {
                             UserMapper userMapper = nextAsyncResult.result();
-                            logger.trace("Found matching user for {}: {}", email, userMapper);
+                            logger.debug("Found matching user for {}: {}", email, userMapper);
                             handler.handle(Future.succeededFuture(userMapper));
                         }
                     });
                 } else {
-                    /* User does not exist. create it */
                     UserMapper userMapper = new UserMapper();
                     userMapper.setEmail(email);
                     userMapper.setUuid(UUID.randomUUID().toString());

@@ -10,20 +10,22 @@ import io.vertx.ext.unit.TestContext;
 import io.vertx.ext.unit.junit.RunTestOnContext;
 import io.vertx.ext.unit.junit.VertxUnitRunner;
 import org.blackcat.trunk.verticles.MainVerticle;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.*;
 import org.junit.runner.RunWith;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeDriverService;
 import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.remote.DesiredCapabilities;
+import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
@@ -50,10 +52,41 @@ public class IntegrationTest {
     static final String addDocumentTabInputXPath = "/html/body/div[1]/div[1]/div[5]/div/div/div[2]/ul/li[2]/a";
     static final String fileSelectorXPath = "//*[@id=\"additional-resource-file-selector\"]";
     static final String commitDocumentButtonXPath = "//*[@id=\"commit-added-resource-file-label\"]";
+    static final String firstCollectionLinkXPath = "/html/body/div/div[1]/div[3]/ul/li/a";
+    static final String minusButtonXPath = "//*[@id=\"minus-button\"]";
+    static final String deleteConfirmationButtonXPath = "//*[@id=\"delete-resource-confirm\"]";
+
     private WebDriver driver;
 
     @Rule
     public final RunTestOnContext rule = new RunTestOnContext(Vertx::vertx);
+
+    @BeforeClass
+    static public void staticInit() {
+        /**
+         * a bloody hack to get selenium chrome web driver to STFU! Unfortunately this completely kills any output to
+         * stdout, so we use stderr in the logback configuration in order to retrieve the application logs for the tests.
+         * (see test/resources/logback.xml).
+         */
+        System.setOut(
+            new PrintStream(new OutputStream() {
+                public void close() {
+                }
+
+                public void flush() {
+                }
+
+                public void write(byte[] b) {
+                }
+
+                public void write(byte[] b, int off, int len) {
+                }
+
+                public void write(int b) {
+                }
+
+            }));
+    }
 
     @Before
     public void init() {
@@ -73,7 +106,7 @@ public class IntegrationTest {
         driver.close();
     }
 
-    @Test(timeout=5000)
+    @Test(timeout = 5000)
     public void publicIndex(TestContext context) {
         Async async = context.async();
         deployForTesting(rule.vertx(), done -> {
@@ -86,7 +119,7 @@ public class IntegrationTest {
         });
     }
 
-    @Test(timeout=5000)
+    @Test(timeout = 5000)
     public void privateIndex(TestContext context) {
         Async async = context.async();
         deployForTesting(rule.vertx(), done -> {
@@ -99,7 +132,7 @@ public class IntegrationTest {
         });
     }
 
-    @Test(timeout=5000)
+    @Test(timeout = 5000)
     public void logout(TestContext context) {
         Async async = context.async();
         deployForTesting(rule.vertx(), done -> {
@@ -115,7 +148,7 @@ public class IntegrationTest {
         });
     }
 
-    @Test(timeout=5000)
+    @Test(timeout = 5000)
     public void createCollection(TestContext context) {
         Async async = context.async();
         deployForTesting(rule.vertx(), done -> {
@@ -127,7 +160,7 @@ public class IntegrationTest {
             new WebDriverWait(driver, 2)
                 .until(ExpectedConditions.visibilityOfElementLocated(
                     By.xpath("/html/body/div[1]/div[1]/div[5]/div")));
-            WebElement nameInput = driver.findElement(By.xpath(additionalCollectionNameInputXPath ));
+            WebElement nameInput = driver.findElement(By.xpath(additionalCollectionNameInputXPath));
             nameInput.sendKeys("whatever");
 
             WebElement commitButton = driver.findElement(By.xpath(commitButtonXPath));
@@ -142,7 +175,34 @@ public class IntegrationTest {
         });
     }
 
-    @Test(timeout=10000)
+    @Test(timeout = 5000)
+    public void deleteCollection(TestContext context) {
+        Async async = context.async();
+        deployForTesting(rule.vertx(), done -> {
+            adminLogin();
+
+            WebElement plusButton = driver.findElement(By.xpath(plusButtonXPath));
+            plusButton.click();
+
+            new WebDriverWait(driver, 2)
+                .until(ExpectedConditions.visibilityOfElementLocated(
+                    By.xpath("/html/body/div[1]/div[1]/div[5]/div")));
+            WebElement nameInput = driver.findElement(By.xpath(additionalCollectionNameInputXPath));
+            nameInput.sendKeys("whatever");
+
+            WebElement commitButton = driver.findElement(By.xpath(commitButtonXPath));
+            commitButton.click();
+
+            WebElement firstCollectionLink = driver.findElement(By.xpath(firstCollectionLinkXPath));
+            firstCollectionLink.click();
+
+            WebElement minusButton = driver.findElement(By.xpath(minusButtonXPath));
+
+            async.complete();
+        });
+    }
+
+    @Test(timeout = 10000)
     public void uploadDocument(TestContext context) {
         Async async = context.async();
         deployForTesting(rule.vertx(), done -> {
@@ -173,6 +233,8 @@ public class IntegrationTest {
         });
     }
 
+    @Ignore
+    @Test(timeout = 10000)
     public void deleteDocument(TestContext context) {
         Async async = context.async();
         deployForTesting(rule.vertx(), done -> {
@@ -196,15 +258,18 @@ public class IntegrationTest {
             WebElement commitButton = driver.findElement(By.xpath(commitDocumentButtonXPath));
             commitButton.click();
 
+            WebElement deleteConfirmationButton = driver.findElement(By.xpath(deleteConfirmationButtonXPath));
+            deleteConfirmationButton.submit();
+
             int laterLength = driver.getPageSource().length();
-            context.assertTrue(laterLength > initialLength);
+            context.assertTrue(laterLength == initialLength);
 
             async.complete();
         });
     }
 
     private void deployForTesting(Vertx vertx, Handler<AsyncResult<String>> done) {
-        vertx.fileSystem().deleteRecursive(rootPath, true, _1-> {
+        vertx.fileSystem().deleteRecursive(rootPath, true, _1 -> {
             vertx.fileSystem().mkdir(rootPath, _2 -> {
                 DeploymentOptions deploymentOptions = new DeploymentOptions();
                 deploymentOptions.setConfig(getConfiguration());

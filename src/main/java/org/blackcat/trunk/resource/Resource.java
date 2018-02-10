@@ -5,7 +5,4 @@ public interface Resource extends Comparable<Resource> {
 
     String getName();
     void setName(String name);
-
-    boolean isModified();
-    void setModified(boolean modified);
 }

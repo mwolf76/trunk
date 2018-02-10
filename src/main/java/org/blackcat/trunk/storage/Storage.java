@@ -2,7 +2,6 @@ package org.blackcat.trunk.storage;
 
 import io.vertx.core.Handler;
 import io.vertx.core.file.FileProps;
-import org.blackcat.trunk.mappers.UserMapper;
 import org.blackcat.trunk.resource.Resource;
 
 import java.io.IOException;
@@ -14,21 +13,13 @@ public interface Storage {
     Path getRoot();
 
     /**
-     * Verifies accessibility of user directory
-     *
-     * @param userMapper
-     * @param done
-     */
-    void checkUserDirectory(UserMapper userMapper, Handler<Void> done);
-
-    /**
      * Stream interface to the file walker in the storage
      *
      * @param start
      * @return
      * @throws IOException
      */
-    public Stream<Path> streamDirectory(Path start) throws IOException;
+    Stream<Path> streamDirectory(Path start) throws IOException;
 
     /**
      * Retrieves properties for path on the storage (blocking)
@@ -37,7 +28,7 @@ public interface Storage {
      * @return
      * @throws IOException
      */
-    FileProps pathProperties(Path path) throws IOException;
+    FileProps resourceProperties(Path path) throws IOException;
 
     /**
      * Deletes a resource from the storage
@@ -49,28 +40,22 @@ public interface Storage {
 
     /**
      * Retrieves a resource from the storage
-     *
-     * @param path the resource to be retrieved from the storage
-     * @param etag
+     *  @param path the resource to be retrieved from the storage
      * @param handler
      */
-    void get(Path path, String etag, Handler<Resource> handler);
+    void get(Path path, Handler<Resource> handler);
 
     /**
-     * Puts a collection resource(directory) on the storage
-     *
-     * @param path the resource to be put on the storage
-     * @param etag
+     * Puts a collection resource (i.e. directory) on the storage
+     *  @param path the resource to be put on the storage
      * @param handler
      */
-    void putCollection(Path path, String etag, Handler<Resource> handler);
+    void putCollectionResource(Path path, Handler<Resource> handler);
 
     /**
-     * Puts a document resource(file) on the storage
-     *
-     * @param path the resource to be put on the storage
-     * @param etag
+     * Puts a document resource (i.e. file) on the storage
+     *  @param path the resource to be put on the storage
      * @param handler
      */
-    void putDocument(Path path, String etag, Handler<Resource> handler);
+    void putDocumentResource(Path path, Handler<Resource> handler);
 }
