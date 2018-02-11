@@ -10,7 +10,7 @@ public interface DeleteResourceRequestHandler extends Handler<RoutingContext> {
      *
      * @return  the handler
      */
-    static PostResourceRequestHandler create() {
+    static DeleteResourceRequestHandler create() {
         return new DeleteResourceRequestHandlerImpl();
     }
 }

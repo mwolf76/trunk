@@ -9,6 +9,7 @@ import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
 import org.blackcat.trunk.conf.Configuration;
 import org.blackcat.trunk.http.Headers;
+import org.blackcat.trunk.http.requests.MainHandler;
 import org.blackcat.trunk.http.requests.response.impl.HtmlResponseBuilderImpl;
 import org.blackcat.trunk.http.requests.response.impl.JsonResponseBuilderImpl;
 import org.blackcat.trunk.storage.Storage;
@@ -16,6 +17,8 @@ import org.blackcat.trunk.storage.Storage;
 import java.text.MessageFormat;
 
 abstract public class BaseUserRequestHandler implements Handler<RoutingContext> {
+
+    static final String requestTypeKey = "requestType";
 
     /* general refs */
     protected Vertx vertx;
@@ -26,34 +29,39 @@ abstract public class BaseUserRequestHandler implements Handler<RoutingContext> 
 
     final private Logger logger = LoggerFactory.getLogger(BaseUserRequestHandler.class);
 
-    private void preprocess(RoutingContext ctx) {
+    @Override
+    public void handle(RoutingContext ctx) {
+        logger.debug(MessageFormat.format("Invoking {0} ...", this.getClass().toString()));
+        preprocess(ctx);
+    }
 
-        vertx = ctx.get("vertx");
+    private void preprocess(RoutingContext ctx) {
+        vertx = ctx.get(MainHandler.vertxKey);
         if (vertx == null) {
             ctx.fail(new BaseUserRequestException("vertx == null"));
         }
 
-        storage = ctx.get("storage");
+        storage = ctx.get(MainHandler.storageKey);
         if (storage == null) {
             ctx.fail(new BaseUserRequestException("storage == null"));
         }
 
-        configuration = ctx.get("configuration");
+        configuration = ctx.get(MainHandler.configurationKey);
         if (configuration == null) {
             ctx.fail(new BaseUserRequestException("configuration == null"));
         }
 
-        jsonResponseBuilder = ctx.get("jsonResponseBuilder");
+        jsonResponseBuilder = ctx.get(MainHandler.jsonResponseBuilderKey);
         if (jsonResponseBuilder == null) {
             ctx.fail(new BaseUserRequestException("jsonResponseBuilder == null"));
         }
 
-        htmlResponseBuilder = ctx.get("htmlResponseBuilder");
+        htmlResponseBuilder = ctx.get(MainHandler.htmlResponseBuilderKey);
         if (htmlResponseBuilder == null) {
             ctx.fail(new BaseUserRequestException("htmlResponseBuilder == null"));
         }
-        
-        ctx.put("requestType", doesAcceptJson(ctx) ? RequestType.JSON : RequestType.HTML);
+
+        ctx.put(requestTypeKey, doesAcceptJson(ctx) ? RequestType.JSON : RequestType.HTML);
     }
 
     private boolean doesAcceptJson(RoutingContext ctx) {
@@ -64,21 +72,15 @@ abstract public class BaseUserRequestHandler implements Handler<RoutingContext> 
         return (accept != null && accept.contains("application/json"));
     }
 
-    @Override
-    public void handle(RoutingContext ctx) {
-        logger.debug(MessageFormat.format("Invoking {0} ...", this.getClass().toString()));
-        preprocess(ctx);
-    }
-
     public void checkHtmlRequest(RoutingContext ctx, Handler<Void> handler) {
-        if (! ctx.get("requestType").equals(RequestType.HTML))
+        if (! ctx.get(requestTypeKey).equals(RequestType.HTML))
             htmlResponseBuilder.badRequest(ctx);
 
         else handler.handle(null);
     }
 
     public void checkJsonRequest(RoutingContext ctx, Handler<Void> handler) {
-        if (! ctx.get("requestType").equals(RequestType.JSON))
+        if (! ctx.get(requestTypeKey).equals(RequestType.JSON))
             jsonResponseBuilder.badRequest(ctx);
 
         else handler.handle(null);

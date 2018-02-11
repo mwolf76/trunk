@@ -210,21 +210,7 @@ public class IntegrationTest {
 
             int initialLength = driver.getPageSource().length();
 
-            WebElement plusButton = driver.findElement(By.xpath(plusButtonXPath));
-            plusButton.click();
-
-            new WebDriverWait(driver, 2)
-                .until(ExpectedConditions.visibilityOfElementLocated(
-                    By.xpath("/html/body/div[1]/div[1]/div[5]/div")));
-
-            WebElement documentTab = driver.findElement(By.xpath(addDocumentTabInputXPath));
-            documentTab.click();
-
-            WebElement fileSelector = driver.findElement(By.xpath(fileSelectorXPath));
-            fileSelector.sendKeys("/home/markus/test.txt");
-
-            WebElement commitButton = driver.findElement(By.xpath(commitDocumentButtonXPath));
-            commitButton.click();
+            uploadTestDocument();
 
             int laterLength = driver.getPageSource().length();
             context.assertTrue(laterLength > initialLength);
@@ -233,39 +219,62 @@ public class IntegrationTest {
         });
     }
 
-    @Ignore
-    @Test(timeout = 10000)
+    @Test(timeout = 30000)
     public void deleteDocument(TestContext context) {
+        String documentDetailsBadgeXPath = "/html/body/div/div[1]/div[3]/ul/li/a[2]/span";
+        String deleteTabXPath = "/html/body/div[1]/div[1]/div[7]/div/div/div/ul/li[3]/a";
+        String confirmButtonXPath = "/html/body/div[1]/div[1]/div[7]/div/div/div/div[1]/div[3]/label";
+
         Async async = context.async();
         deployForTesting(rule.vertx(), done -> {
             adminLogin();
 
             int initialLength = driver.getPageSource().length();
 
-            WebElement plusButton = driver.findElement(By.xpath(plusButtonXPath));
-            plusButton.click();
+            uploadTestDocument();
 
             new WebDriverWait(driver, 2)
                 .until(ExpectedConditions.visibilityOfElementLocated(
-                    By.xpath("/html/body/div[1]/div[1]/div[5]/div")));
+                    By.xpath(documentDetailsBadgeXPath)));
 
-            WebElement documentTab = driver.findElement(By.xpath(addDocumentTabInputXPath));
-            documentTab.click();
+            WebElement documentDetailsBadge = driver.findElement(By.xpath(documentDetailsBadgeXPath));
+            documentDetailsBadge.click();
 
-            WebElement fileSelector = driver.findElement(By.xpath(fileSelectorXPath));
-            fileSelector.sendKeys("/home/markus/test.txt");
+            new WebDriverWait(driver, 2)
+                .until(ExpectedConditions.visibilityOfElementLocated(
+                    By.xpath(deleteTabXPath)));
 
-            WebElement commitButton = driver.findElement(By.xpath(commitDocumentButtonXPath));
-            commitButton.click();
+            WebElement deleteTab = driver.findElement(By.xpath(deleteTabXPath));
+            deleteTab.click();
 
-            WebElement deleteConfirmationButton = driver.findElement(By.xpath(deleteConfirmationButtonXPath));
-            deleteConfirmationButton.submit();
+            WebElement confirmButton = driver.findElement(By.xpath(confirmButtonXPath));
+            confirmButton.click();
+
+            driver.navigate().refresh();
 
             int laterLength = driver.getPageSource().length();
             context.assertTrue(laterLength == initialLength);
 
             async.complete();
         });
+    }
+
+    private void uploadTestDocument() {
+        WebElement plusButton = driver.findElement(By.xpath(plusButtonXPath));
+        plusButton.click();
+
+        new WebDriverWait(driver, 2)
+            .until(ExpectedConditions.visibilityOfElementLocated(
+                By.xpath("/html/body/div[1]/div[1]/div[5]/div")));
+
+        WebElement documentTab = driver.findElement(By.xpath(addDocumentTabInputXPath));
+        documentTab.click();
+
+        WebElement fileSelector = driver.findElement(By.xpath(fileSelectorXPath));
+        fileSelector.sendKeys("/home/markus/test.txt");
+
+        WebElement commitButton = driver.findElement(By.xpath(commitDocumentButtonXPath));
+        commitButton.click();
     }
 
     private void deployForTesting(Vertx vertx, Handler<AsyncResult<String>> done) {

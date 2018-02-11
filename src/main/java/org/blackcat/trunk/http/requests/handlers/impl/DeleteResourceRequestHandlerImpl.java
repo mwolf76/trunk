@@ -4,14 +4,14 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
-import org.blackcat.trunk.http.requests.handlers.PostResourceRequestHandler;
+import org.blackcat.trunk.http.requests.handlers.DeleteResourceRequestHandler;
 import org.blackcat.trunk.resource.impl.ErrorResource;
 
 import java.nio.file.Path;
 
 import static org.blackcat.trunk.util.Utils.protectedPath;
 
-final public class DeleteResourceRequestHandlerImpl extends BaseUserRequestHandler implements PostResourceRequestHandler {
+final public class DeleteResourceRequestHandlerImpl extends BaseUserRequestHandler implements DeleteResourceRequestHandler {
 
     final private Logger logger = LoggerFactory.getLogger(DeleteResourceRequestHandlerImpl.class);
 

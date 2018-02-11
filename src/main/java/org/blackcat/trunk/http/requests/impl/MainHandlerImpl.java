@@ -10,6 +10,7 @@ import io.vertx.ext.auth.oauth2.OAuth2FlowType;
 import io.vertx.ext.auth.oauth2.providers.GoogleAuth;
 import io.vertx.ext.auth.oauth2.providers.KeycloakAuth;
 import io.vertx.ext.web.Router;
+import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.*;
 import io.vertx.ext.web.sstore.LocalSessionStore;
 import io.vertx.ext.web.templ.PebbleTemplateEngine;
@@ -60,12 +61,6 @@ public final class MainHandlerImpl implements MainHandler {
 
     private void setupMiddlewareHandlers() {
 
-        final String vertxKey = "vertx";
-        final String storageKey = "storage";
-        final String configurationKey = "configuration";
-        final String jsonResponseBuilderKey = "jsonResponseBuilder";
-        final String htmlResponseBuilderKey = "htmlResponseBuilder";
-
         /* hack required to prevent request to be prematurely consumed when doing uploads */
         router.postWithRegex("/protected/.*").handler(ctx -> {
             ctx.request().pause();
@@ -73,18 +68,7 @@ public final class MainHandlerImpl implements MainHandler {
         });
 
         // Initial routing ctx setup
-        router.route().handler(ctx -> {
-            // Add general refs to the ctx
-            ctx.put( vertxKey, vertx);
-            ctx.put( storageKey, storage);
-            ctx.put( configurationKey, configuration);
-
-            // it's up to the request handler to decider whether to use one or the other
-            ctx.put(jsonResponseBuilderKey, jsonResponseBuilder);
-            ctx.put(htmlResponseBuilderKey, htmlResponseBuilder);
-
-            ctx.next();
-        });
+        router.route().handler(this::injectContextVars);
 
         // We need cookies, sessions and request bodies
         router.route().handler(CookieHandler.create());
@@ -99,6 +83,18 @@ public final class MainHandlerImpl implements MainHandler {
         } else sessionHandler.setNagHttps(false); /* avoid nagging about not using https */
 
         router.route().handler(sessionHandler);
+    }
+
+    private void injectContextVars(RoutingContext ctx) {
+        ctx.put( vertxKey, vertx);
+        ctx.put( storageKey, storage);
+        ctx.put( configurationKey, configuration);
+
+        // it's up to the request handler to decider whether to use one or the other
+        ctx.put(jsonResponseBuilderKey, jsonResponseBuilder);
+        ctx.put(htmlResponseBuilderKey, htmlResponseBuilder);
+
+        ctx.next();
     }
 
     private void setupErrorHandlers() {

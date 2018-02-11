@@ -8,6 +8,13 @@ import org.blackcat.trunk.http.requests.impl.MainHandlerImpl;
 import org.blackcat.trunk.storage.Storage;
 
 public interface MainHandler extends Handler<HttpServerRequest> {
+
+    String vertxKey = "vertx";
+    String storageKey = "storage";
+    String configurationKey = "configuration";
+    String jsonResponseBuilderKey = "jsonResponseBuilder";
+    String htmlResponseBuilderKey = "htmlResponseBuilder";
+
     /**
      * Create a new handler
      *
