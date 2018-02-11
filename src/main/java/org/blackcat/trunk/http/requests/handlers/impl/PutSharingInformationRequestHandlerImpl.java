@@ -28,11 +28,7 @@ final public class PutSharingInformationRequestHandlerImpl extends BaseUserReque
     @Override
     public void handle(RoutingContext ctx) {
         super.handle(ctx);
-
-        if (ctx.get("requestType").equals(RequestType.HTML))
-            jsonResponseBuilder.badRequest(ctx);
-
-        else if (isValidRequestBody(ctx)) {
+        checkJsonRequest(ctx, ok -> {
             Path collectionPath = collectionPath(ctx);
             Queries.findCreateUserEntityByEmail(ctx.vertx(), ctx.get("email"), userMapperAsyncResult -> {
                 if (userMapperAsyncResult.failed())
@@ -44,10 +40,7 @@ final public class PutSharingInformationRequestHandlerImpl extends BaseUserReque
                     } else jsonResponseBuilder.methodNotAllowed(ctx);
                 }
             });
-        } else {
-            logger.warn("Bad request (invalid request body) {}", ctx.request().uri());
-            jsonResponseBuilder.badRequest(ctx);
-        }
+        });
     }
 
     private void asyncRewriteCollectionShareInfo(RoutingContext ctx, Path collectionPath, UserMapper userMapper) {
@@ -64,15 +57,6 @@ final public class PutSharingInformationRequestHandlerImpl extends BaseUserReque
                 setupRewriteTaskChain(ctx, userMapper, newAuthorizedUsers(ctx), asyncResult.result());
             }
         });
-    }
-
-    private boolean isValidRequestBody(RoutingContext ctx) {
-        JsonObject json = ctx.getBodyAsJson();
-        if (json == null) {
-            return false;
-        }
-
-        return true;
     }
 
     private boolean userOwnsThisCollection(UserMapper userMapper, Path collectionPath) {

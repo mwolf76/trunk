@@ -14,19 +14,20 @@ final public class LogoutHandlerImpl extends BaseUserRequestHandler implements U
     @Override
     public void handle(RoutingContext ctx) {
         super.handle(ctx);
-
-        AccessToken user = (AccessToken) ctx.user();
-        if (user == null) {
-            cleanupAndRedirect(ctx);
-        } else {
-            user.logout(ar -> {
-                if (ar.failed())
-                    ctx.fail(ar.cause());
-                else {
-                    cleanupAndRedirect(ctx);
-                }
-            });
-        }
+        checkHtmlRequest(ctx, ok -> {
+            AccessToken user = (AccessToken) ctx.user();
+            if (user == null) {
+                cleanupAndRedirect(ctx);
+            } else {
+                user.logout(ar -> {
+                    if (ar.failed())
+                        ctx.fail(ar.cause());
+                    else {
+                        cleanupAndRedirect(ctx);
+                    }
+                });
+            }
+        });
     }
 
     private void cleanupAndRedirect(RoutingContext ctx) {

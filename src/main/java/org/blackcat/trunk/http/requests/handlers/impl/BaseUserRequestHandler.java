@@ -69,4 +69,18 @@ abstract public class BaseUserRequestHandler implements Handler<RoutingContext> 
         logger.debug(MessageFormat.format("Invoking {0} ...", this.getClass().toString()));
         preprocess(ctx);
     }
+
+    public void checkHtmlRequest(RoutingContext ctx, Handler<Void> handler) {
+        if (! ctx.get("requestType").equals(RequestType.HTML))
+            htmlResponseBuilder.badRequest(ctx);
+
+        else handler.handle(null);
+    }
+
+    public void checkJsonRequest(RoutingContext ctx, Handler<Void> handler) {
+        if (! ctx.get("requestType").equals(RequestType.JSON))
+            jsonResponseBuilder.badRequest(ctx);
+
+        else handler.handle(null);
+    }
 }

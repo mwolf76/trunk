@@ -27,10 +27,7 @@ final public class ProtectedIndexHandlerImpl extends BaseUserRequestHandler impl
     @Override
     public void handle(RoutingContext ctx) {
         super.handle(ctx);
-
-        if (ctx.get("requestType").equals(RequestType.JSON))
-            htmlResponseBuilder.badRequest(ctx);
-        else {
+        checkHtmlRequest(ctx, ok -> {
             Queries.findCreateUserEntityByEmail(ctx.vertx(), ctx.get("email"), userMapperAsyncResult -> {
                 if (userMapperAsyncResult.failed())
                     ctx.fail(userMapperAsyncResult.cause());
@@ -47,7 +44,7 @@ final public class ProtectedIndexHandlerImpl extends BaseUserRequestHandler impl
                     });
                 }
             });
-        }
+        });
     }
 
     private void ensureUserRootCollectionExists(RoutingContext ctx, UserMapper userMapper, Handler<AsyncResult<Void>> handler) {

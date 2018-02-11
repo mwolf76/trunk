@@ -24,45 +24,46 @@ final public class GetSharingInformationHandlerImpl extends BaseUserRequestHandl
     @Override
     public void handle(RoutingContext ctx) {
         super.handle(ctx);
+        checkJsonRequest(ctx, ok -> {
+            Path collectionPath = collectionPath(ctx);
 
+            String email = ctx.get("email");
+            Queries.findCreateUserEntityByEmail(ctx.vertx(), email, userMapperAsyncResult -> {
+                if (userMapperAsyncResult.failed())
+                    ctx.fail(userMapperAsyncResult.cause());
+                else {
+                    Queries.findShareEntity(ctx.vertx(), collectionPath, shareMapperAsyncResult -> {
+
+                        if (shareMapperAsyncResult.failed())
+                            ctx.fail(shareMapperAsyncResult.cause());
+                        else {
+                            ShareMapper shareMapper = shareMapperAsyncResult.result();
+                            JsonArray jsonArray = new JsonArray();
+
+                            List<String> authorizedUsers = shareMapper.getAuthorizedUsers();
+                            for (String authorizedUser : authorizedUsers) {
+                                jsonArray.add(authorizedUser);
+                            }
+
+                            String collectionPathString = collectionPath.toString();
+                            logger.debug("Serving sharing info for {}", collectionPathString);
+                            jsonResponseBuilder.success(ctx,
+                                new JsonObject()
+                                    .put("data", new JsonObject()
+                                                     .put("collectionPath", collectionPathString)
+                                                     .put("authorizedUsers", jsonArray)));
+                        }
+                    });
+                }
+            });
+        });
+    }
+
+    private Path collectionPath(RoutingContext ctx) {
         HttpServerRequest request = ctx.request();
         String requestPathString = Utils.urlDecode(request.path());
         Path requestPath = Paths.get(requestPathString);
         Path topLevelPath = Paths.get("/share");
-        Path collectionPath = topLevelPath.relativize(requestPath);
-        String collectionPathString = collectionPath.toString();
-
-        String email = ctx.get("email");
-        Queries.findCreateUserEntityByEmail(ctx.vertx(), email, userMapperAsyncResult -> {
-            if (userMapperAsyncResult.failed())
-                ctx.fail(userMapperAsyncResult.cause());
-            else {
-                Queries.findShareEntity(ctx.vertx(), collectionPath, shareMapperAsyncResult -> {
-
-                    if (shareMapperAsyncResult.failed())
-                        ctx.fail(shareMapperAsyncResult.cause());
-                    else {
-                        ShareMapper shareMapper = shareMapperAsyncResult.result();
-                        JsonArray jsonArray = new JsonArray();
-
-                        List<String> authorizedUsers = shareMapper.getAuthorizedUsers();
-                        for (String authorizedUser : authorizedUsers) {
-                            jsonArray.add(authorizedUser);
-                        }
-
-                        String body = new JsonObject()
-                                          .put("data", new JsonObject()
-                                                           .put("collectionPath", collectionPathString)
-                                                           .put("authorizedUsers", jsonArray))
-                                          .encodePrettily();
-
-                        ctx.response()
-                            .putHeader(Headers.CONTENT_LENGTH_HEADER, String.valueOf(body.length()))
-                            .putHeader(Headers.CONTENT_TYPE_HEADER, "application/json; charset=utf-8")
-                            .end(body);
-                    }
-                });
-            }
-        });
+        return topLevelPath.relativize(requestPath);
     }
 }

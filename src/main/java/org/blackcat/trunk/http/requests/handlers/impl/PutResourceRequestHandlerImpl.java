@@ -1,11 +1,9 @@
 package org.blackcat.trunk.http.requests.handlers.impl;
 
-import io.vertx.core.MultiMap;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
-import org.blackcat.trunk.http.Headers;
 import org.blackcat.trunk.http.requests.handlers.PutResourceRequestHandler;
 import org.blackcat.trunk.resource.impl.ErrorResource;
 
@@ -21,17 +19,10 @@ final public class PutResourceRequestHandlerImpl extends BaseUserRequestHandler 
     public void handle(RoutingContext ctx) {
         super.handle(ctx);
 
-        if (ctx.get("requestType").equals(RequestType.HTML))
-            jsonResponseBuilder.badRequest(ctx);
-
-        else {
+        checkJsonRequest(ctx, ok -> {
             Path protectedPath = protectedPath(ctx);
-
-            MultiMap headers = ctx.request().headers();
-            String etag = headers.get(Headers.IF_NONE_MATCH_HEADER);
-
             Path resolvedPath = storage.getRoot().resolve(protectedPath);
-            logger.trace("PUT {} -> {} [etag = {}]", protectedPath, resolvedPath, etag);
+            logger.trace("PUT {} -> {}", protectedPath, resolvedPath);
 
             storage.putCollectionResource(resolvedPath, resource -> {
                 if (resource instanceof ErrorResource) {
@@ -46,9 +37,8 @@ final public class PutResourceRequestHandlerImpl extends BaseUserRequestHandler 
                         logger.debug("UNEXPECTED: {}", ctx.request().uri());
                         ctx.fail(new BaseUserRequestException("Unexpected error"));
                     }
-                    return;
                 }
             });
-        }
+        });
     }
 }

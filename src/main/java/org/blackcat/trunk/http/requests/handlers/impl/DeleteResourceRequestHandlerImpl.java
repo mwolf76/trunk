@@ -18,10 +18,7 @@ final public class DeleteResourceRequestHandlerImpl extends BaseUserRequestHandl
     @Override
     public void handle(RoutingContext ctx) {
         super.handle(ctx);
-
-        if (ctx.get("requestType").equals(RequestType.HTML))
-            jsonResponseBuilder.badRequest(ctx);
-        else {
+        checkJsonRequest(ctx, ok -> {
             Path protectedPath = protectedPath(ctx);
             Path resolvedPath = storage.getRoot().resolve(protectedPath);
             logger.trace("DELETE {} -> {}", protectedPath, resolvedPath);
@@ -31,20 +28,17 @@ final public class DeleteResourceRequestHandlerImpl extends BaseUserRequestHandl
                     ErrorResource errorResource = (ErrorResource) resource;
                     if (errorResource.isNotFound()) {
                         jsonResponseBuilder.notFound(ctx);
-                        return;
                     } else if (errorResource.isInvalid()) {
                         jsonResponseBuilder.conflict(ctx);
-                        return;
                     } else if (errorResource.isUnit()) {
-                        logger.debug("Ok: {}", ctx.request().uri());
+                        logger.debug("Successfully deleted {}", ctx.request().uri());
                         jsonResponseBuilder.success(ctx, new JsonObject());
-                        return;
                     }
+                } else {
+                    logger.error("Unexpected error resource type");
+                    ctx.fail(new BaseUserRequestException("Unexpected error resource type"));
                 }
-
-                logger.error("Unexpected error resource type");
-                ctx.fail(new BaseUserRequestException("Unexpected error resource type"));
             });
-        }
+        });
     }
 }
