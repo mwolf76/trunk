@@ -5,7 +5,7 @@ import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.web.RoutingContext;
 import org.blackcat.trunk.http.requests.handlers.DeleteResourceRequestHandler;
-import org.blackcat.trunk.resource.impl.ErrorResource;
+import org.blackcat.trunk.resource.exceptions.NotFoundException;
 
 import java.nio.file.Path;
 
@@ -23,20 +23,19 @@ final public class DeleteResourceRequestHandlerImpl extends BaseUserRequestHandl
             Path resolvedPath = storage.getRoot().resolve(protectedPath);
             logger.trace("DELETE {} -> {}", protectedPath, resolvedPath);
 
-            storage.delete(resolvedPath, resource -> {
-                if (resource instanceof ErrorResource) {
-                    ErrorResource errorResource = (ErrorResource) resource;
-                    if (errorResource.isNotFound()) {
+            storage.delete(resolvedPath, asyncResult -> {
+                if (asyncResult.failed()) {
+                    Throwable cause = asyncResult.cause();
+                    if (cause instanceof NotFoundException) {
+                        logger.debug("Could not delete resource {} (not found).");
                         jsonResponseBuilder.notFound(ctx);
-                    } else if (errorResource.isInvalid()) {
+                    } else {
+                        logger.debug("Could not delete resource {}.", asyncResult.cause());
                         jsonResponseBuilder.conflict(ctx);
-                    } else if (errorResource.isUnit()) {
-                        logger.debug("Successfully deleted {}", ctx.request().uri());
-                        jsonResponseBuilder.success(ctx, new JsonObject());
                     }
                 } else {
-                    logger.error("Unexpected error resource type");
-                    ctx.fail(new BaseUserRequestException("Unexpected error resource type"));
+                    logger.debug("Successfully deleted {}", ctx.request().uri());
+                    jsonResponseBuilder.success(ctx, new JsonObject());
                 }
             });
         });

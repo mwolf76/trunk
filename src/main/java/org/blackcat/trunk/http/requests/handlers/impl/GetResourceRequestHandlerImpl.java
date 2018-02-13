@@ -1,6 +1,8 @@
 package org.blackcat.trunk.http.requests.handlers.impl;
 
 import com.mitchellbosecke.pebble.utils.Pair;
+import io.vertx.core.AsyncResult;
+import io.vertx.core.Handler;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.JsonObject;
@@ -15,10 +17,10 @@ import org.blackcat.trunk.mappers.ShareMapper;
 import org.blackcat.trunk.mappers.UserMapper;
 import org.blackcat.trunk.queries.Queries;
 import org.blackcat.trunk.resource.Resource;
+import org.blackcat.trunk.resource.exceptions.NotFoundException;
 import org.blackcat.trunk.resource.impl.CollectionResource;
 import org.blackcat.trunk.resource.impl.DocumentContentResource;
 import org.blackcat.trunk.resource.impl.DocumentDescriptorResource;
-import org.blackcat.trunk.resource.impl.ErrorResource;
 import org.blackcat.trunk.streams.impl.PumpImpl;
 import org.blackcat.trunk.util.AsyncInputStream;
 import org.blackcat.trunk.util.TarballInputStream;
@@ -97,28 +99,27 @@ final public class GetResourceRequestHandlerImpl extends BaseUserRequestHandler 
         Path resolvedPath = storage.getRoot().resolve(protectedPath);
         logger.trace("GET {} -> {}", protectedPath.toString(), resolvedPath.toString());
 
-        storage.get(resolvedPath, resource -> {
-            if (resource instanceof ErrorResource) {
-                errorResourceResponse(ctx, (ErrorResource) resource);
-            } else if (resource instanceof CollectionResource) {
-                collectionResourceResponse(ctx, (CollectionResource) resource, resolvedPath, shareMapper, isOwner);
-            } else if (resource instanceof DocumentDescriptorResource) {
-                documentDescriptorResponse(ctx, (DocumentDescriptorResource) resource);
-            } else if (resource instanceof DocumentContentResource) {
-                documentContentResponse(ctx, (DocumentContentResource) resource);
+        storage.get(resolvedPath, resourceAsyncResult -> {
+            if (resourceAsyncResult.failed()) {
+                Throwable cause = resourceAsyncResult.cause();
+                if (cause instanceof NotFoundException) {
+                    logger.debug("Resource not found: {}", ctx.request().uri());
+                    htmlResponseBuilder.notFound(ctx);
+                } else {
+                    logger.debug("Could not retrieve resource {}: {}", ctx.request().uri(), cause);
+                    htmlResponseBuilder.badRequest(ctx);
+                }
+            } else {
+                Resource resource = resourceAsyncResult.result();
+                if (resource instanceof CollectionResource) {
+                    collectionResourceResponse(ctx, (CollectionResource) resource, resolvedPath, shareMapper, isOwner);
+                } else if (resource instanceof DocumentDescriptorResource) {
+                    documentDescriptorResponse(ctx, (DocumentDescriptorResource) resource);
+                } else if (resource instanceof DocumentContentResource) {
+                    documentContentResponse(ctx, (DocumentContentResource) resource);
+                }
             }
         });
-    }
-
-    private void errorResourceResponse(RoutingContext ctx, ErrorResource resource) {
-        if (resource.isNotFound()) {
-            HttpServerRequest request = ctx.request();
-            logger.debug("Resource not found: {}", request.uri());
-            htmlResponseBuilder.notFound(ctx);
-        } else {
-            logger.error("Unexpected resource type");
-            ctx.fail(new BaseUserRequestException("Unexpected error resource type"));
-        }
     }
 
     private void collectionResourceResponse(RoutingContext ctx, CollectionResource resource,

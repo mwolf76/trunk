@@ -1,18 +1,25 @@
 package org.blackcat.trunk.storage.impl;
 
 import io.vertx.core.AsyncResult;
+import io.vertx.core.Future;
 import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
-import io.vertx.core.file.*;
+import io.vertx.core.file.AsyncFile;
+import io.vertx.core.file.FileProps;
+import io.vertx.core.file.FileSystem;
+import io.vertx.core.file.OpenOptions;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import org.blackcat.trunk.resource.Resource;
+import org.blackcat.trunk.resource.exceptions.ConflictException;
+import org.blackcat.trunk.resource.exceptions.NotFoundException;
+import org.blackcat.trunk.resource.exceptions.UnsupportedException;
 import org.blackcat.trunk.resource.impl.CollectionResource;
 import org.blackcat.trunk.resource.impl.DocumentContentResource;
 import org.blackcat.trunk.resource.impl.DocumentDescriptorResource;
-import org.blackcat.trunk.resource.impl.ErrorResource;
 import org.blackcat.trunk.storage.Storage;
 import org.blackcat.trunk.util.Utils;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -50,7 +57,7 @@ public class FileSystemStorage implements Storage {
     }
 
     @Override
-    public void get(Path path, Handler<Resource> resourceHandler) {
+    public void get(Path path, Handler<AsyncResult<Resource>> resourceHandler) {
 
         /* local ref to the filesystem object */
         FileSystem fileSystem = vertx.fileSystem();
@@ -58,7 +65,10 @@ public class FileSystemStorage implements Storage {
         /* if resource exists ... */
         String pathString = path.toString();
         fileSystem.exists(pathString, existsAsyncResult -> {
-            if (existsAsyncResult.result()) {
+            if (existsAsyncResult.failed())
+                resourceHandler.handle(Future.failedFuture(existsAsyncResult.cause()));
+
+            else if (existsAsyncResult.result()) {
                 fileSystem.props(pathString, filePropsAsyncResult -> {
                     normalResource(path, resourceHandler,
                         fileSystem, pathString, filePropsAsyncResult);
@@ -68,13 +78,13 @@ public class FileSystemStorage implements Storage {
             /* Not found. Is it a `/meta` GET request? */
             else if (path.endsWith("meta")) {
                 metaResource(path, resourceHandler, fileSystem);
-            } else {
-                resourceHandler.handle(ErrorResource.makeNotFound());
             }
+
+            else resourceHandler.handle(Future.failedFuture(new NotFoundException()));
         });
     } /* get() */
 
-    private void normalResource(Path path, Handler<Resource> resourceHandler, FileSystem fileSystem,
+    private void normalResource(Path path, Handler<AsyncResult<Resource>> resourceHandler, FileSystem fileSystem,
                                 String pathString, AsyncResult<FileProps> filePropsAsyncResult) {
         FileProps fileProperties = filePropsAsyncResult.result();
 
@@ -83,7 +93,6 @@ public class FileSystemStorage implements Storage {
             fileSystem.readDir(pathString, dirAsyncResult -> {
 
                 vertx.executeBlocking(future -> {
-
                     CollectionResource collectionResource =
                         new CollectionResource();
 
@@ -109,13 +118,7 @@ public class FileSystemStorage implements Storage {
                                 logger.warn("Skipping unreadable directory: {0}", entryPath);
                             }
                         } else if (fileProps.isRegularFile()) {
-                            String mimeType = null;
-
-                            try {
-                                mimeType = Files.probeContentType(entryPath);
-                            } catch (IOException e) {
-                                logger.warn("Could not determine mime type for {}", entryPath);
-                            }
+                            String mimeType = getMimeType(entryPath);
                             collectionResource.addItem(
                                 new DocumentDescriptorResource(entryNameString, mimeType,
                                     fileProps.creationTime(), fileProps.lastModifiedTime(),
@@ -128,7 +131,7 @@ public class FileSystemStorage implements Storage {
                     future.complete(collectionResource);
                 }, done -> {
                     final CollectionResource collectionResource = (CollectionResource) done.result();
-                    resourceHandler.handle(collectionResource);
+                    resourceHandler.handle(Future.succeededFuture(collectionResource));
                 });
             });
         }
@@ -146,20 +149,19 @@ public class FileSystemStorage implements Storage {
                             asyncFile.close();
                         });
 
-                    resourceHandler.handle(documentContentResource);
+                    resourceHandler.handle(Future.succeededFuture(documentContentResource));
                 } catch (IOException ioe) {
-                    resourceHandler.handle(ErrorResource.makeInvalid(ioe.toString()));
+                    resourceHandler.handle(Future.failedFuture(new ConflictException(ioe)));
                 }
             });
         }
 
-        /* Invalid resource */
         else {
-            resourceHandler.handle(ErrorResource.makeInvalid("Unsupported resource type"));
+            resourceHandler.handle(Future.failedFuture(new UnsupportedOperationException()));
         }
     }
 
-    private void metaResource(Path path, Handler<Resource> resourceHandler, FileSystem fileSystem) {
+    private void metaResource(Path path, Handler<AsyncResult<Resource>> resourceHandler, FileSystem fileSystem) {
         Path resourcePath = path.getParent();
         String resourcePathString = resourcePath.toString();
 
@@ -174,21 +176,16 @@ public class FileSystemStorage implements Storage {
                     FileProps fileProperties = filePropsAsyncResult.result();
 
                     if (fileProperties.isDirectory()) {
-                        /* TODO: meta not yet supported for collections */
-                        resourceHandler.handle(ErrorResource.makeRejected());
+                        // TODO: 2/13/18 meta not yet supported for collections
+                        resourceHandler.handle(Future.failedFuture(new UnsupportedException()));
                     } else if (fileProperties.isRegularFile()) {
-                        String mimeType = null;
-                        try {
-                            mimeType = Files.probeContentType(resourcePath);
-                        } catch (IOException e) {
-                            logger.warn("Could not determine mime type for {}", resourcePath);
-                        }
+                        String mimeType = getMimeType(resourcePath);
                         DocumentDescriptorResource documentDescriptorResource =
                             new DocumentDescriptorResource(resourceFileNameString, mimeType,
                                 fileProperties.creationTime(), fileProperties.lastModifiedTime(),
                                 fileProperties.lastAccessTime(), fileProperties.size());
 
-                        resourceHandler.handle(documentDescriptorResource);
+                        resourceHandler.handle(Future.succeededFuture(documentDescriptorResource));
                     }
                 });
             }
@@ -196,87 +193,93 @@ public class FileSystemStorage implements Storage {
     }
 
     @Override
-    public void putCollectionResource(Path path, Handler<Resource> resourceHandler) {
-
-        /* local ref to the filesystem object */
+    public void putCollectionResource(Path path, Handler<AsyncResult<Void>> resourceHandler) {
         FileSystem fileSystem = vertx.fileSystem();
-
         String pathString = path.toString();
 
         fileSystem.exists(pathString, existsAsyncResult -> {
-            Boolean exists = existsAsyncResult.result();
+            if (existsAsyncResult.failed())
+                resourceHandler.handle(Future.failedFuture(existsAsyncResult.cause()));
 
-            if (exists) {
+            else if (existsAsyncResult.result()) {
                 fileSystem.props(pathString, propsAsyncResult -> {
                     FileProps props = propsAsyncResult.result();
 
                     /* if resource already exists and it's a collection we're good */
                     if (props.isDirectory()) {
-                        Resource res = ErrorResource.makeUnit();
-                        resourceHandler.handle(res);
-                        return;
+                        resourceHandler.handle(Future.succeededFuture());
                     }
 
                     /* if resource already exists and it's not a directory we complain */
                     else if (props.isRegularFile()) {
-                        Resource res = ErrorResource.makeInvalid("A document with the same name already exists.");
-                        resourceHandler.handle(res);
-                        return;
+                        resourceHandler.handle(Future.failedFuture(
+                            new ConflictException("A document with the same name already exists.")));
                     }
                 });
             }
 
-            /* Resource does not exist, we *require* to parent directory to exist */
+            /* Resource does not exist, we *require* to parent directory to exist to create it. */
             else {
                 Path parentPath = path.getParent();
                 String parentPathString = parentPath.toString();
+
                 fileSystem.exists(parentPathString, parentExistsAsyncResult -> {
-                    Boolean parentExists = parentExistsAsyncResult.result();
-                    if (parentExists) {
-                        fileSystem.mkdirs(pathString, asyncMkdirsResult -> {
-                            Resource res = (asyncMkdirsResult.succeeded())
-                                               ? ErrorResource.makeUnit()
-                                               : ErrorResource.makeInvalid(asyncMkdirsResult.cause().toString());
-                            resourceHandler.handle(res);
-                        });
+                    if (parentExistsAsyncResult.failed())
+                        resourceHandler.handle(Future.failedFuture(parentExistsAsyncResult.cause()));
+
+                    else if (parentExistsAsyncResult.result()) {
+                        mkDir(resourceHandler, fileSystem, pathString);
+                    } else {
+                        logger.warn("Can not create collection resource {}. Parent does not exist.", pathString);
+                        resourceHandler.handle(Future.failedFuture(
+                            new ConflictException("Can not create collection resource.")));
                     }
                 });
             }
         });
     } /* putCollectionResource() */
 
+    private void mkDir(Handler<AsyncResult<Void>> resourceHandler, FileSystem fileSystem, String pathString) {
+        fileSystem.mkdirs(pathString, asyncMkdirsResult -> {
+            if (asyncMkdirsResult.failed())
+                resourceHandler.handle(Future.failedFuture(
+                    new ConflictException(asyncMkdirsResult.cause())));
+            else {
+                resourceHandler.handle(Future.succeededFuture());
+            }
+        });
+    }
+
     @Override
-    public void putDocumentResource(Path path, Handler<Resource> resourceHandler) {
-
-        /* local ref to the filesystem object */
+    public void putDocumentResource(Path path, Handler<AsyncResult<Resource>> resourceHandler) {
         FileSystem fileSystem = vertx.fileSystem();
-
         String pathString = path.toString();
-        fileSystem.exists(pathString, existsAsyncResult -> {
-            Boolean exists = existsAsyncResult.result();
 
-            if (exists) {
+        fileSystem.exists(pathString, existsAsyncResult -> {
+            if (existsAsyncResult.failed())
+                resourceHandler.handle(Future.failedFuture(existsAsyncResult.cause()));
+
+            else if (existsAsyncResult.result()) {
                 fileSystem.props(pathString, propsAsyncResult -> {
                     FileProps props = propsAsyncResult.result();
 
                     /* if resource already exists and it's a collection we complain */
                     if (props.isDirectory()) {
-                        Resource res = ErrorResource.makeInvalid("A collection with the same name already exists.");
-                        resourceHandler.handle(res);
+                        resourceHandler.handle(Future.failedFuture(
+                            new ConflictException("A collection with the same name already exists.")));
                     }
 
                     /* ... we overwrite it */
                     else if (props.isRegularFile()) {
-                        putDocumentHelper(path, resourceHandler, event -> {
-                            resourceHandler.handle(ErrorResource.makeUnit());
+                        putDocumentHelper(path, resourceHandler, completed -> {
+                            resourceHandler.handle(Future.succeededFuture());
                         });
-                        return;
                     }
 
                     /* ??? */
                     else {
-                        resourceHandler.handle(ErrorResource.makeInvalid(
-                            "Existing resource is neither a collection nor a document."));
+                        resourceHandler.handle(Future.failedFuture(new ConflictException(
+                            "Existing resource is neither a collection nor a document.")));
                     }
                 });
             }
@@ -287,73 +290,90 @@ public class FileSystemStorage implements Storage {
                 String parentPathString = parentPath.toString();
 
                 fileSystem.exists(parentPathString, parentExistsAsyncResult -> {
+                    if (parentExistsAsyncResult.failed())
+                        resourceHandler.handle(Future.failedFuture(parentExistsAsyncResult.cause()));
 
-                    Boolean parentExists = parentExistsAsyncResult.result();
-                    if (parentExists) {
-                        putDocumentHelper(path, resourceHandler, event -> {
-                            resourceHandler.handle(ErrorResource.makeUnit());
+                    else if (parentExistsAsyncResult.result()) {
+                        putDocumentHelper(path, resourceHandler, completed -> {
+                            resourceHandler.handle(Future.succeededFuture());
                         });
                     } else {
-                        resourceHandler.handle(ErrorResource.makeInvalid(
-                            "Parent collection not existing."));
+                        resourceHandler.handle(Future.failedFuture(new ConflictException(
+                            "Parent collection not existing.")));
                     }
                 });
             }
         });
     } /* putDocumentResource() */
 
-    private void putDocumentHelper(final Path fullPath, final Handler<Resource> handler,
-                                   final Handler<Void> completionHandler) {
+    private void putDocumentHelper(Path fullPath,
+                                   Handler<AsyncResult<Resource>> handler,
+                                   Handler<Void> completionHandler) {
 
-        /* local ref to the filesystem object */
         FileSystem fileSystem = vertx.fileSystem();
-
         String destPathString = fullPath.toString();
         String tempPathString = Utils.makeTempFileName(destPathString);
 
         fileSystem.open(tempPathString, openOptions, openAsyncResult -> {
-            if (openAsyncResult.succeeded()) {
+            if (openAsyncResult.failed())
+                handler.handle(Future.failedFuture(new ConflictException(openAsyncResult.cause())));
 
-                final AsyncFile asyncFile =
+            else {
+                AsyncFile asyncFile =
                     openAsyncResult.result();
 
-                final DocumentContentResource documentContentResource =
-                    new DocumentContentResource(asyncFile, dummy ->
-                                                               asyncFile.close(closeAsyncResult ->
-                                                                                   fileSystem.delete(destPathString, deleteAsyncResult ->
-                                                                                                                         fileSystem.move(tempPathString, destPathString, moveAsyncResult -> {
-                                                                                                                             logger.info("Operation completed.");
-                                                                                                                             completionHandler.handle(null);
-                                                                                                                         }))));
+                // TODO: 2/13/18 this is way too hard to read. Refactor it!
+                DocumentContentResource documentContentResource =
+                    new DocumentContentResource(asyncFile,
+                        done -> completeTransfer(fileSystem, asyncFile, destPathString, tempPathString, completionHandler));
 
-                handler.handle(documentContentResource);
-            } else {
-                handler.handle(ErrorResource.makeInvalid(openAsyncResult.cause().toString()));
+                handler.handle(Future.succeededFuture(documentContentResource));
             }
         });
     } /* putDocumentHelper() */
 
-    @Override
-    public void delete(Path path, Handler<Resource> resourceHandler) {
+    private void completeTransfer(FileSystem fileSystem, AsyncFile asyncFile, String destPathString, String tempPathString, Handler<Void> completionHandler) {
+        asyncFile.close(closeAsyncResult ->
+                            fileSystem.delete(destPathString,
+                                deleteAsyncResult ->
+                                    fileSystem.move(tempPathString, destPathString,
+                                        moveAsyncResult -> {
+                                            logger.info("File transfer operation completed.");
+                                            completionHandler.handle(null);
+                                        })));
+    }
 
-        /* local ref to the filesystem object */
+    @Nullable
+    private String getMimeType(Path resourcePath) {
+        String mimeType = null;
+        try {
+            mimeType = Files.probeContentType(resourcePath);
+        } catch (IOException e) {
+            logger.warn("Could not determine mime type for {}", resourcePath);
+        }
+        return mimeType;
+    }
+
+    @Override
+    public void delete(Path path, Handler<AsyncResult<Void>> resourceHandler) {
         FileSystem fileSystem = vertx.fileSystem();
 
         String pathString = path.toString();
-
         fileSystem.exists(pathString, existsAsyncResult -> {
-            final Boolean exists = existsAsyncResult.result();
-
-            if (!exists) {
-                resourceHandler.handle(ErrorResource.makeNotFound());
-            } else {
-                fileSystem.delete(pathString, deleteAsyncResult -> {
-                    Resource resource = deleteAsyncResult.succeeded()
-                                            ? ErrorResource.makeUnit()
-                                            : ErrorResource.makeInvalid(deleteAsyncResult.cause().toString());
-
-                    resourceHandler.handle(resource);
-                });
+            if (existsAsyncResult.failed())
+                resourceHandler.handle(Future.failedFuture(existsAsyncResult.cause()));
+            else {
+                if (! existsAsyncResult.result()) {
+                    resourceHandler.handle(Future.failedFuture(new NotFoundException()));
+                } else {
+                    fileSystem.delete(pathString, deleteAsyncResult -> {
+                        if (deleteAsyncResult.failed())
+                            resourceHandler.handle(Future.failedFuture(
+                                new ConflictException(deleteAsyncResult.cause())));
+                        else
+                            resourceHandler.handle(Future.succeededFuture());
+                    });
+                }
             }
         });
     } /* delete() */

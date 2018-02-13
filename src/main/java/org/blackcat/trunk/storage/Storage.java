@@ -1,5 +1,6 @@
 package org.blackcat.trunk.storage;
 
+import io.vertx.core.AsyncResult;
 import io.vertx.core.Handler;
 import io.vertx.core.file.FileProps;
 import org.blackcat.trunk.resource.Resource;
@@ -32,30 +33,29 @@ public interface Storage {
 
     /**
      * Deletes a resource from the storage
-     *
-     * @param path the resource to be deleted from the storage
+     *  @param path the resource to be deleted from the storage
      * @param handler
      */
-    void delete(Path path, Handler<Resource> handler);
+    void delete(Path path, Handler<AsyncResult<Void>> handler);
 
     /**
      * Retrieves a resource from the storage
-     *  @param path the resource to be retrieved from the storage
+     * @param path the resource to be retrieved from the storage
      * @param handler
      */
-    void get(Path path, Handler<Resource> handler);
+    void get(Path path, Handler<AsyncResult<Resource>> handler);
 
     /**
      * Puts a collection resource (i.e. directory) on the storage
-     *  @param path the resource to be put on the storage
+     * @param path the resource to be put on the storage
      * @param handler
      */
-    void putCollectionResource(Path path, Handler<Resource> handler);
+    void putCollectionResource(Path path, Handler<AsyncResult<Void>> handler);
 
     /**
      * Puts a document resource (i.e. file) on the storage
-     *  @param path the resource to be put on the storage
+     * @param path the resource to be put on the storage
      * @param handler
      */
-    void putDocumentResource(Path path, Handler<Resource> handler);
+    void putDocumentResource(Path path, Handler<AsyncResult<Resource>> handler);
 }

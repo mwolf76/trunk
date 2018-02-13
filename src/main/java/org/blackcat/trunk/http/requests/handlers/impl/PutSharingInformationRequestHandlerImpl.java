@@ -75,7 +75,7 @@ final public class PutSharingInformationRequestHandlerImpl extends BaseUserReque
         /* first link of the chain */
         Future<Void> initFuture = Future.future(invoked -> {
             logger.info("Started updating share permissions, owner is {}.", userMapper.getEmail());
-            ResponseUtils.complete(ctx); /* return control to the user, process will continue in background */
+            jsonResponseBuilder.success(ctx, new JsonObject()); /* return control to the user, process will continue in background */
         });
 
         /* put together intermediate links of the chain (actual tasks) */

@@ -190,6 +190,10 @@ function putShare(collectionPath, authorizedUsers, successCallback, errorCallbac
 
     $.ajax({
         type: "PUT",
+        dataType: "json",
+        accepts: {
+            json: "application/json"
+        },
         url: "/share/" + collectionPath,
         data: JSON.stringify({
             authorizedUsers: authorizedUsers
