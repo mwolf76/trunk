@@ -17,6 +17,7 @@ public class TarballInputStream extends InputStream {
     private final Storage storage;
     private final PipedInputStream in;
     private final TarOutputStream out;
+    private long totalBytesWritten = 0;
 
     private boolean canceled;
 
@@ -34,51 +35,32 @@ public class TarballInputStream extends InputStream {
         this.in = new PipedInputStream();
         this.out = new TarOutputStream(new PipedOutputStream(in));
         this.storage = storage;
-        this.canceled = false;
-
         new Thread(() -> {
 
             List<Path> entries;
-            try (Stream<Path> pathStream = storage.streamDirectory(storage.getRoot().resolve(collectionPath))) {
-                entries = pathStream.filter(this::isRegularFile).collect(Collectors.toList());
-            } catch (IOException ioe) {
-                throw new RuntimeException("An error occurred while collecting entries for the archive.");
-            }
-            logger.info("collected {} entries", entries.size());
+            try (Stream<Path> pathStream = pathStream(storage, collectionPath)) {
+                entries = pathStream
+                              .filter(this::isRegularFile)
+                              .collect(Collectors.toList());
+                logger.debug("collected {} entries", entries.size());
 
-            try {
-                for (Path entry : entries) {
-                    File file = entry.toFile();
-                    String filename = storage.getRoot().relativize(entry).toString();
-
-                    TarEntry tarEntry = new TarEntry(file, filename);
-                    out.putNextEntry(tarEntry);
-
-                    try (BufferedInputStream origin =
-                             new BufferedInputStream(new FileInputStream(file))) {
-
-                        int count;
-                        byte data[] = new byte[1024];
-
-                        while (!isCanceled() && (count = origin.read(data)) != -1) {
-                            out.write(data, 0, count);
+                entries.stream().forEach(entry -> {
+                    if (! isCanceled()) {
+                        logger.debug("adding {} ...", entry);
+                        String filename = relativeFilename(storage, entry);
+                        try {
+                            out.putNextEntry(new TarEntry(entry.toFile(), filename));
+                        } catch (IOException e) {
+                            logger.error("Could not add {} [{}]", filename, e.toString());
                         }
 
-                        /* graceful termination upon cancellation */
-                        if (isCanceled())
-                            break;
-
-                        out.flush();
-                    } catch (FileNotFoundException e) {
-                        e.printStackTrace();
-                    } catch (IOException e) {
-                        e.printStackTrace();
+                        totalBytesWritten += addEntryToTarball(entry.toFile());
                     }
-                }
+                });
 
                 /* closing the output stream */
                 out.close();
-                logger.info("tarball stream is now closed");
+                logger.info("Written {} bytes. Tarball stream is now closed", totalBytesWritten);
             } catch (IOException ioe) {
                 logger.error(ioe.toString());
                 throw new RuntimeException(ioe);
@@ -86,12 +68,36 @@ public class TarballInputStream extends InputStream {
         }).start();
     }
 
-    private boolean isRegularFile(Path path) {
-        try {
-            return storage.resourceProperties(path).isRegularFile();
+    private long addEntryToTarball(File file) {
+        long bytesWritten = 0;
+        try (BufferedInputStream origin =
+                 new BufferedInputStream(new FileInputStream(file))) {
+
+            int count;
+            byte data[] = new byte[1024];
+
+            while (!isCanceled() && (count = origin.read(data)) != -1) {
+                bytesWritten += count;
+                out.write(data, 0, count);
+            }
+
+            out.flush();
         } catch (IOException ioe) {
-            return false;
+            logger.error(ioe.toString());
         }
+        return bytesWritten;
+    }
+
+    private String relativeFilename(Storage storage, Path entry) {
+        return storage.getRoot().relativize(entry).toString();
+    }
+
+    private Stream<Path> pathStream(Storage storage, Path collectionPath) {
+        return storage.streamDirectory(storage.getRoot().resolve(collectionPath));
+    }
+
+    private boolean isRegularFile(Path path) {
+        return storage.resourceProperties(path).isRegularFile();
     }
 
     @Override

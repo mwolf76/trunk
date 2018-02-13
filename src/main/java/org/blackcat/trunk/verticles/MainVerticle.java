@@ -38,10 +38,9 @@ public class MainVerticle extends AbstractVerticle {
                             simpleName,
                             deployResponse.cause());
                     } else {
-                        logger.info("{} deployed successfully", simpleName);
-
+                        logger.debug("{} deployed successfully", simpleName);
                         if (verticleCount.decrementAndGet() == 0) {
-                            logger.info("All verticles deployed and running. Ready to serve requests.");
+                            logger.info("All services up and running.");
                             startFuture.complete();
                         }
                     }
@@ -49,7 +48,7 @@ public class MainVerticle extends AbstractVerticle {
             });
 
         Configuration configuration = new Configuration(config);
-        logger.info(configuration);
+        logger.debug(configuration);
 
         int timeout = configuration.getStartTimeout();
         vertx.setTimer(TimeUnit.SECONDS.toMillis(timeout), event -> {

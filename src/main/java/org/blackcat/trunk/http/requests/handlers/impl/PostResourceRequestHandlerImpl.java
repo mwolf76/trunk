@@ -1,9 +1,6 @@
 package org.blackcat.trunk.http.requests.handlers.impl;
 
-import io.vertx.core.AsyncResult;
-import io.vertx.core.Handler;
 import io.vertx.core.http.HttpServerRequest;
-import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -59,13 +56,13 @@ final public class PostResourceRequestHandlerImpl extends BaseUserRequestHandler
         Pump pump = Pump.pump(request, resource.getWriteStream());
 
         request.endHandler(event -> {
-            logger.info("... incoming file transfer completed, {} bytes transferred.",
+            logger.debug("... incoming file transfer completed, {} bytes transferred.",
                 ((PumpImpl) pump).getBytesPumped());
 
             resource.getCloseHandler().handle(null);
         });
 
-        logger.info("incoming file transfer started ...");
+        logger.debug("incoming file transfer started ...");
         pump.start();
 
         request.resume();

@@ -53,7 +53,7 @@ public class WebServerVerticle extends AbstractVerticle {
             .requestHandler(MainHandler.create(vertx, configuration, storage))
             .listen(httpPort, result -> {
                 if (result.succeeded()) {
-                    logger.info("Web server is now ready to accept requests on port {}.", httpPort);
+                    logger.debug("Web server is now ready to accept requests on port {}.", httpPort);
                     startFuture.complete();
                 }
             });

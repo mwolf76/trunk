@@ -1,8 +1,6 @@
 package org.blackcat.trunk.http.requests.handlers.impl;
 
 import com.mitchellbosecke.pebble.utils.Pair;
-import io.vertx.core.AsyncResult;
-import io.vertx.core.Handler;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.JsonObject;
@@ -40,23 +38,25 @@ final public class GetResourceRequestHandlerImpl extends BaseUserRequestHandler 
 
     final private Logger logger = LoggerFactory.getLogger(GetResourceRequestHandlerImpl.class);
 
+    final static String tarMimeType = "application/x-tar";
+
     @Override
     public void handle(RoutingContext ctx) {
         super.handle(ctx);
-        Path protectedPath = protectedPath(ctx);
 
-        logger.info("Getting resource {} -> {}", ctx.request().path(), protectedPath);
         Queries.findCreateUserEntityByEmail(ctx.vertx(), ctx.get("email"), userMapperAsyncResult -> {
 
-            if (userMapperAsyncResult.failed())
+            if (userMapperAsyncResult.failed()) {
                 ctx.fail(userMapperAsyncResult.cause());
+            }
             else {
-                UserMapper userMapper =
-                    userMapperAsyncResult.result();
+                UserMapper userMapper = userMapperAsyncResult.result();
 
-                /* check for ownership */
-                if (protectedPath.startsWith(Paths.get(userMapper.getUuid()))) {
-                    logger.info("Ownership granted to user {}. No further auth checks required.",
+                Path protectedPath = protectedPath(ctx);
+                logger.info("Getting resource {}", protectedPath);
+
+                if (userHasOwnership(userMapper, protectedPath)) {
+                    logger.debug("Ownership granted to user {}. No further auth checks required.",
                         userMapper.getEmail());
 
                     Queries.findShareEntity(ctx.vertx(), protectedPath, shareMapperAsyncResult -> {
@@ -77,7 +77,7 @@ final public class GetResourceRequestHandlerImpl extends BaseUserRequestHandler 
                             ShareMapper shareMapper = shareMapperAsyncResult.result();
                             if (shareMapper.isAuthorized(userMapper.getEmail())) {
 
-                                logger.info("Auth granted by sharing permissions to user {}.",
+                                logger.debug("Auth granted by sharing permissions to user {}.",
                                     userMapper.getEmail());
 
                                 getResourceAux(ctx, shareMapper, false);
@@ -94,6 +94,10 @@ final public class GetResourceRequestHandlerImpl extends BaseUserRequestHandler 
         });
     }
 
+    private boolean userHasOwnership(UserMapper userMapper, Path protectedPath) {
+        return protectedPath.startsWith(Paths.get(userMapper.getUuid()));
+    }
+
     private void getResourceAux(RoutingContext ctx, ShareMapper shareMapper, boolean isOwner) {
         Path protectedPath = protectedPath(ctx);
         Path resolvedPath = storage.getRoot().resolve(protectedPath);
@@ -103,10 +107,10 @@ final public class GetResourceRequestHandlerImpl extends BaseUserRequestHandler 
             if (resourceAsyncResult.failed()) {
                 Throwable cause = resourceAsyncResult.cause();
                 if (cause instanceof NotFoundException) {
-                    logger.debug("Resource not found: {}", ctx.request().uri());
+                    logger.warn("Resource not found: {}", ctx.request().uri());
                     htmlResponseBuilder.notFound(ctx);
                 } else {
-                    logger.debug("Could not retrieve resource {}: {}", ctx.request().uri(), cause);
+                    logger.warn("Could not retrieve resource {}: {}", ctx.request().uri(), cause);
                     htmlResponseBuilder.badRequest(ctx);
                 }
             } else {
@@ -192,7 +196,8 @@ final public class GetResourceRequestHandlerImpl extends BaseUserRequestHandler 
         return request.absoluteURI() + urlEncode(collectionResource.getName()) + "/";
     }
 
-    private void collectionHtmlResponse(RoutingContext ctx, ShareMapper shareMapper, Path protectedPath, CollectionResource collection, boolean isOwner) {
+    private void collectionHtmlResponse(RoutingContext ctx, ShareMapper shareMapper,
+                                        Path protectedPath, CollectionResource collection, boolean isOwner) {
         List<Pair<String, String>> frags = new ArrayList<>();
 
         protectedPath
@@ -224,13 +229,16 @@ final public class GetResourceRequestHandlerImpl extends BaseUserRequestHandler 
         }
 
         ctx
-            .put("collectionTitle", String.format("trunk (%s)", ctx.<String>get("email")))
+            .put("collectionTitle", collectionTitle(ctx))
             .put("collectionPath", protectedPath)
             .put("pathFragments", frags)
             .put("entries", collection.getItems());
 
-        // and now delegate to the engine to renderHTML it.
         htmlResponseBuilder.success(ctx, "collection");
+    }
+
+    private String collectionTitle(RoutingContext ctx) {
+        return String.format("trunk (%s)", ctx.<String>get("email"));
     }
 
     private void collectionTarballResponse(RoutingContext ctx, Path resolvedPath) {
@@ -238,69 +246,79 @@ final public class GetResourceRequestHandlerImpl extends BaseUserRequestHandler 
             TarballInputStream tarballInputStream =
                 new TarballInputStream(storage, resolvedPath);
 
-            AsyncInputStream asyncInputStream = new AsyncInputStream(
-                vertx, tarballInputStream);
-
             String archiveName = resolvedPath.getFileName().toString() + ".tar";
 
             ctx.response()
-                .putHeader(Headers.CONTENT_TYPE_HEADER, "application/x-tar")
-                .putHeader(Headers.CONTENT_DISPOSITION, String.format(
-                    "attachment; filename=\"%s\"", archiveName))
+                .putHeader(Headers.CONTENT_TYPE_HEADER, tarMimeType)
+                .putHeader(Headers.CONTENT_DISPOSITION, String.format("attachment; filename=\"%s\"", archiveName))
                 .setChunked(true) // required
             ;
 
-            asyncInputStream.exceptionHandler( exception -> {
-                logger.error(exception.toString());
-            });
-
-            /* setting up xfer */
-            Pump pump = Pump.pump(asyncInputStream, ctx.response());
-
-            /* when all is done on the destination stream, report stats and close the response. */
-            asyncInputStream
-                .exceptionHandler(cause -> {
-                    logger.error(cause.toString());
-                })
-                .endHandler(event -> {
-                    pump.stop();
-                    logger.info("... archive file transfer completed, {} bytes transferred.",
-                        ((PumpImpl) pump).getBytesPumped());
-
-                    ResponseUtils.complete(ctx);
-                });
-
-            ctx
-                .response()
-                .closeHandler(event -> {
-                    logger.info("interrupted by client");
-                    tarballInputStream.setCanceled(true);
-                });
-
-            logger.info("archive file transfer started for {} ...", archiveName);
-            pump.start();
+            setupTarballTransfer(ctx, tarballInputStream, archiveName);
         }
         catch (IOException ioe) {
-            logger.error(ioe.toString());
+            logger.error(ioe);
             ctx.fail(ioe);
         }
     }
 
+    private void setupTarballTransfer(RoutingContext ctx, TarballInputStream tarballInputStream,
+                                      String archiveName) {
+
+        AsyncInputStream asyncInputStream = new AsyncInputStream(
+            vertx, tarballInputStream);
+
+        asyncInputStream.exceptionHandler( exception -> {
+            logger.error(exception.toString());
+            ctx.fail(exception);
+        });
+
+        Pump pump = Pump.pump(asyncInputStream, ctx.response());
+
+        /* when all is done on the destination stream, report stats and close the response. */
+        asyncInputStream
+            .exceptionHandler(cause -> {
+                logger.error(cause.toString());
+            })
+            .endHandler(event -> {
+                pump.stop();
+                logger.debug("... archive file transfer completed, {} bytes transferred.",
+                    ((PumpImpl) pump).getBytesPumped());
+
+                ResponseUtils.complete(ctx);
+            });
+
+        ctx
+            .response()
+            .closeHandler(event -> {
+                logger.warn("interrupted by client");
+                tarballInputStream.setCanceled(true);
+            });
+
+        logger.debug("archive file transfer started for {} ...", archiveName);
+        pump.start();
+    }
+
     private void documentDescriptorResponse(RoutingContext ctx, DocumentDescriptorResource resource) {
         checkJsonRequest(ctx, ok -> {
-            jsonResponseBuilder.success(ctx, new JsonObject()
-                .put("meta", new JsonObject()
-                                 .put("href",
-                                     ctx.request().absoluteURI() +
-                                         urlEncode(resource.getName() + "/meta"))
-                                 .put("name", resource.getName())
-                                 .put("mimeType", resource.getMimeType())
-                                 .put("class", "document")
-                                 .put("created", resource.getCreationTime())
-                                 .put("modified", resource.getLastModificationTime())
-                                 .put("accessed", resource.getLastAccessedTime())
-                                 .put("length", resource.getLength())));
+            jsonResponseBuilder.success(ctx,
+                new JsonObject()
+                    .put("meta", new JsonObject()
+                                     .put("href", metaResourceURL(ctx, resource))
+                                     .put("name", resource.getName())
+                                     .put("mimeType", resource.getMimeType())
+                                     .put("class", "document")
+                                     .put("created", resource.getCreationTime())
+                                     .put("modified", resource.getLastModificationTime())
+                                     .put("accessed", resource.getLastAccessedTime())
+                                     .put("length", resource.getLength())));
         });
+    }
+
+    @NotNull
+    private String metaResourceURL(RoutingContext ctx, DocumentDescriptorResource resource) {
+        return ctx.request().absoluteURI() +
+            urlEncode(resource.getName() + "/meta");
     }
 
     private void documentContentResponse(RoutingContext ctx, DocumentContentResource resource) {
@@ -326,7 +344,7 @@ final public class GetResourceRequestHandlerImpl extends BaseUserRequestHandler 
                     ResponseUtils.complete(ctx);
                 });
 
-            logger.info("outgoing file transfer started ...");
+            logger.debug("outgoing file transfer started ...");
             pump.start();
         }
     }

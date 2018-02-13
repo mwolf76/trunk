@@ -20,21 +20,21 @@ final public class DeleteResourceRequestHandlerImpl extends BaseUserRequestHandl
         super.handle(ctx);
         checkJsonRequest(ctx, ok -> {
             Path protectedPath = protectedPath(ctx);
-            Path resolvedPath = storage.getRoot().resolve(protectedPath);
-            logger.trace("DELETE {} -> {}", protectedPath, resolvedPath);
+            logger.info("Deleting resource {}", protectedPath);
 
+            Path resolvedPath = storage.getRoot().resolve(protectedPath);
             storage.delete(resolvedPath, asyncResult -> {
                 if (asyncResult.failed()) {
                     Throwable cause = asyncResult.cause();
                     if (cause instanceof NotFoundException) {
-                        logger.debug("Could not delete resource {} (not found).");
+                        logger.warn("Resource not found.");
                         jsonResponseBuilder.notFound(ctx);
                     } else {
-                        logger.debug("Could not delete resource {}.", asyncResult.cause());
+                        logger.warn("Could not delete resource {}.", asyncResult.cause());
                         jsonResponseBuilder.conflict(ctx);
                     }
                 } else {
-                    logger.debug("Successfully deleted {}", ctx.request().uri());
+                    logger.info("Successfully deleted {}", ctx.request().uri());
                     jsonResponseBuilder.success(ctx, new JsonObject());
                 }
             });

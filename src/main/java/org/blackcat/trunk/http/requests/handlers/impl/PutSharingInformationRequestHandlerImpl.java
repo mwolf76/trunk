@@ -44,12 +44,8 @@ final public class PutSharingInformationRequestHandlerImpl extends BaseUserReque
     }
 
     private void asyncRewriteCollectionShareInfo(RoutingContext ctx, Path collectionPath, UserMapper userMapper) {
-        vertx.<List<Path>> executeBlocking(future -> {
-            try (Stream<Path> pathStream = storage.streamDirectory(storage.getRoot().resolve(collectionPath))) {
-                future.complete(pathStream.collect(Collectors.toList()));
-            } catch (IOException ioe) {
-                future.fail(ioe);
-            }
+        vertx.executeBlocking((Future<List<Path>> future) -> {
+            future.complete(pathStream(collectionPath).collect(Collectors.toList()));
         }, asyncResult -> {
             if (asyncResult.failed()) {
                 ctx.fail(asyncResult.cause());
@@ -57,6 +53,10 @@ final public class PutSharingInformationRequestHandlerImpl extends BaseUserReque
                 setupRewriteTaskChain(ctx, userMapper, newAuthorizedUsers(ctx), asyncResult.result());
             }
         });
+    }
+
+    private Stream<Path> pathStream(Path collectionPath) {
+        return storage.streamDirectory(storage.getRoot().resolve(collectionPath));
     }
 
     private boolean userOwnsThisCollection(UserMapper userMapper, Path collectionPath) {

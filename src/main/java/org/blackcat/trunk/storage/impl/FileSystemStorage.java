@@ -18,6 +18,7 @@ import org.blackcat.trunk.resource.impl.CollectionResource;
 import org.blackcat.trunk.resource.impl.DocumentContentResource;
 import org.blackcat.trunk.resource.impl.DocumentDescriptorResource;
 import org.blackcat.trunk.storage.Storage;
+import org.blackcat.trunk.storage.exceptions.StorageException;
 import org.blackcat.trunk.util.Utils;
 import org.jetbrains.annotations.Nullable;
 
@@ -47,13 +48,18 @@ public class FileSystemStorage implements Storage {
     }
 
     @Override
-    public FileProps resourceProperties(Path path) throws IOException {
+    public FileProps resourceProperties(Path path) {
         return vertx.fileSystem().propsBlocking(path.toString());
     }
 
     @Override
-    public Stream<Path> streamDirectory(Path start) throws IOException {
-        return Files.walk(start);
+    public Stream<Path> streamDirectory(Path start) {
+        try {
+            return Files.walk(start);
+        }
+        catch (IOException ioe) {
+            throw new StorageException(ioe);
+        }
     }
 
     @Override

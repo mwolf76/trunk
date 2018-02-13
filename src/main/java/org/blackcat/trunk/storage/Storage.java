@@ -20,7 +20,7 @@ public interface Storage {
      * @return
      * @throws IOException
      */
-    Stream<Path> streamDirectory(Path start) throws IOException;
+    Stream<Path> streamDirectory(Path start);
 
     /**
      * Retrieves properties for path on the storage (blocking)
@@ -29,7 +29,7 @@ public interface Storage {
      * @return
      * @throws IOException
      */
-    FileProps resourceProperties(Path path) throws IOException;
+    FileProps resourceProperties(Path path);
 
     /**
      * Deletes a resource from the storage

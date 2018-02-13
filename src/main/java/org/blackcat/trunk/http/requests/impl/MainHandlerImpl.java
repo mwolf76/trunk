@@ -174,14 +174,9 @@ public final class MainHandlerImpl implements MainHandler {
                 MessageFormat.format("Unsupported OAuth2 provider: {0}", oauth2ProviderName));
         }
 
-        // FIXME: 2/3/18 This sucks!
-        String callBackFullURL = String.format("http%s://%s:%d%s",
-            configuration.isSSLEnabled() ? "s" : "",
-            configuration.getHttpHost(),
-            configuration.getHttpPort(),
-            OAUTH2_CALLBACK_LOCATION);
-        logger.info("Setting up oauth2 callback at {}", callBackFullURL);
-        OAuth2AuthHandler authHandler = OAuth2AuthHandler.create(authProvider, callBackFullURL);
+        String callbackURL = callbackURL();
+        logger.debug("Setting up oauth2 callback at {}", callbackURL);
+        OAuth2AuthHandler authHandler = OAuth2AuthHandler.create(authProvider, callbackURL);
 
         /* We need a user session handler too to make sure the user is stored in the session between requests */
         router.route().handler(UserSessionHandler.create(authProvider));
@@ -190,6 +185,14 @@ public final class MainHandlerImpl implements MainHandler {
         authHandler.setupCallback(router.get(OAUTH2_CALLBACK_LOCATION));
         router.routeWithRegex("/protected/.*").handler(authHandler);
         router.routeWithRegex("/share/.*").handler(authHandler);
+    }
+
+    private String callbackURL() {
+        return String.format("http%s://%s:%d%s",
+            configuration.isSSLEnabled() ? "s" : "",
+            configuration.getHttpHost(),
+            configuration.getHttpPort(),
+            OAUTH2_CALLBACK_LOCATION);
     }
 
     private JsonObject buildKeyCloakConfiguration() {
@@ -204,7 +207,7 @@ public final class MainHandlerImpl implements MainHandler {
 
     @Override
     public void handle(HttpServerRequest request) {
-        logger.info("Routing HTTP Request: {} {}", request.method(), request.uri());
+        logger.trace("Routing {} {}", request.method(), request.uri());
         router.accept(request);
     }
 

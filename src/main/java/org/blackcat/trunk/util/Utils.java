@@ -88,19 +88,9 @@ final public class Utils {
         return s.substring(0, s.length() - 2);
     }
 
-    @NotNull
-    public static Path requestProtectedPath(HttpServerRequest request) {
-        Path prefix = Paths.get("/protected");
-        return prefix.relativize(Paths.get(urlDecode(request.path())));
-    }
-
     public static Path protectedPath(RoutingContext ctx) {
         Path prefix = Paths.get("/protected");
         return prefix.relativize(Paths.get(urlDecode(ctx.request().path())));
-    }
-
-    public static boolean requestURLasTrailingSlash(HttpServerRequest request) {
-        return urlDecode(request.path()).endsWith("/");
     }
 
     @NotNull
