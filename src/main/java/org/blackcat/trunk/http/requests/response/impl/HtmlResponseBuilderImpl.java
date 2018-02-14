@@ -94,6 +94,10 @@ public final class HtmlResponseBuilderImpl implements HtmlResponseBuilder {
         ResponseStatus status = ResponseStatus.INTERNAL_SERVER_ERROR;
         String templateName = "internal-error";
 
+        Throwable failure = ctx.failure();
+        if (failure != null)
+            failure.printStackTrace();
+
         HttpServerResponse response = ctx.response();
         response
             .setStatusCode(status.getStatusCode())

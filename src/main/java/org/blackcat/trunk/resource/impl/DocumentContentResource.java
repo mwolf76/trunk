@@ -16,11 +16,6 @@ public final class DocumentContentResource extends BaseResource {
         return length;
     }
 
-    private String etag;
-    public String getEtag() {
-        return etag;
-    }
-
     private String mimetype;
     public String getMimeType() {
         return mimetype;

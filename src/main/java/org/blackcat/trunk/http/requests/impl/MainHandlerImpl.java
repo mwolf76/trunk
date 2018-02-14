@@ -162,10 +162,12 @@ public final class MainHandlerImpl implements MainHandler {
         final String oauth2ProviderName = configuration.getOauth2Provider();
 
         if (oauth2ProviderName.equals(OAUTH2_PROVIDER_GOOGLE)) {
+            logger.info("Configuring Google oauth2 provider");
             authProvider = GoogleAuth.create(vertx,
                 configuration.getOauth2ClientID(),
                 configuration.getOauth2ClientSecret());
         } else if (oauth2ProviderName.equals(OAUTH2_PROVIDER_KEYCLOAK)) {
+            logger.info("Configuring Keycloak oauth2 provider");
             authProvider = KeycloakAuth.create(vertx,
                 OAuth2FlowType.AUTH_CODE,
                 buildKeyCloakConfiguration());
@@ -177,6 +179,10 @@ public final class MainHandlerImpl implements MainHandler {
         String callbackURL = callbackURL();
         logger.debug("Setting up oauth2 callback at {}", callbackURL);
         OAuth2AuthHandler authHandler = OAuth2AuthHandler.create(authProvider, callbackURL);
+
+        /* required by google,  keycloak doesn't care */
+        authHandler.addAuthority("profile");
+        authHandler.addAuthority("email");
 
         /* We need a user session handler too to make sure the user is stored in the session between requests */
         router.route().handler(UserSessionHandler.create(authProvider));

@@ -16,7 +16,7 @@ final public class LogoutHandlerImpl extends BaseUserRequestHandler implements U
         super.handle(ctx);
         checkHtmlRequest(ctx, ok -> {
             AccessToken user = (AccessToken) ctx.user();
-            if (user == null) {
+            if (user == null || configuration.getOauth2Provider().equals("google")) {
                 cleanupAndRedirect(ctx);
             } else {
                 user.logout(ar -> {
@@ -33,6 +33,7 @@ final public class LogoutHandlerImpl extends BaseUserRequestHandler implements U
     private void cleanupAndRedirect(RoutingContext ctx) {
         String email = ctx.get("email");
 
+        ctx.clearUser();
         ctx.session().destroy();
         logger.info("Logged out user {}. Redirecting to / ...", email);
         ResponseUtils.found(ctx, "/");

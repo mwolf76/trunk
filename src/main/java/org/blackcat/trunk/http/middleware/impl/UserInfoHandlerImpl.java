@@ -25,23 +25,24 @@ final public class UserInfoHandlerImpl implements UserInfoHandler {
                     }
                     else {
                         logger.info("Access Token refreshed!");
-                        introspectAccessToken(ctx, accessToken);
+                        userInfo(ctx, accessToken);
                     }
                 });
             } else {
-                introspectAccessToken(ctx, accessToken);
+                userInfo(ctx, accessToken);
             }
         }
     }
 
-    private void introspectAccessToken(RoutingContext ctx, AccessToken accessToken) {
-        accessToken.introspect(ar -> {
+    private void userInfo(RoutingContext ctx, AccessToken accessToken) {
+        accessToken.userInfo(ar -> {
             if (ar.failed()) {
+                logger.error("Cannot retrieve user data from oauth2 server for this user.");
                 ctx.session().destroy();
                 ctx.fail(ar.cause());
             } else {
-                JsonObject principal = accessToken.principal();
-                String email = principal.getString("email");
+                JsonObject result = ar.result();
+                String email = result.getString("email");
                 logger.debug("Successfully retrieved user data from oauth2 server for user {}", email);
 
                 ctx.put("email", email);

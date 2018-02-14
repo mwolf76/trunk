@@ -1,0 +1,29 @@
+{
+  "web": {
+    "timeout": 10,
+    "hostname": "localhost",
+    "port": 8080,
+    "useSSL": true,
+    "keystoreFilename": "server-keystore.jks",
+    "keystorePassword": "wibble"
+  },
+  "database": {
+    "type": "mongodb",
+    "host": "localhost",
+    "port": 27017,
+    "name": "trunk"
+  },
+  "oauth2": {
+    "authServerURL": "http://localhost:9000/auth",
+    "authServerRealm": "master",
+    "authServerPublicKey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAv4I32wX0+PPAE+UiA86nbZVwtpCOtgtSc6eZ3Bux1lL2ur5U4UVFUD4+ZfD1QQ83lFszhRU50wGnEh174bJqkPbaXOq8uED3R3pDgpK3C3foNoQg/tEpq8IUqp+aRC0MSM6P2fVrjzS+diIYc22h5CWQXxy/dBPzNF8cpYMYEiN+Cjhc6UrBMZC3aVbI7L8e096DLyTnhCizkBbmwe7L6lGI8oXLgXLF7XeValT1E0ffSLkoOnXj7Ojn9zUE0AZclZ0m9e4A+kMJKbKJ2LkjtrLV3R1tKuTIJ9Tw9U850e3apmLTjvvc2aCxuxrbwzukJ5osCP+u3n4uEzkQHHhv6QIDAQAB",
+
+    "provider": "keycloak",
+    "clientID": "trunk",
+    "clientSecret": "21fc3fa4-161a-4bd6-9420-407222dea72b"
+  },
+  "storage": {
+    "root": "/tmp/trunk",
+    "userQuota": 0 /* TODO: support quota */
+  }
+}
