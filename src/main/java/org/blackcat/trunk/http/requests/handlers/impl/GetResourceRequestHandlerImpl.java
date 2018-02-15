@@ -244,7 +244,7 @@ final public class GetResourceRequestHandlerImpl extends BaseUserRequestHandler 
     private void collectionTarballResponse(RoutingContext ctx, Path resolvedPath) {
         try {
             TarballInputStream tarballInputStream =
-                new TarballInputStream(storage, resolvedPath);
+                new TarballInputStream(vertx, storage, resolvedPath);
 
             String archiveName = resolvedPath.getFileName().toString() + ".tar";
 
@@ -262,37 +262,31 @@ final public class GetResourceRequestHandlerImpl extends BaseUserRequestHandler 
         }
     }
 
-    private void setupTarballTransfer(RoutingContext ctx, TarballInputStream tarballInputStream,
-                                      String archiveName) {
+    private void setupTarballTransfer(RoutingContext ctx, TarballInputStream tarballInputStream, String archiveName) {
 
-        AsyncInputStream asyncInputStream = new AsyncInputStream(
-            vertx, tarballInputStream);
+        /* interruption handler */
+        ctx.response()
+            .closeHandler(event -> {
+                logger.warn("interrupted by client");
+                tarballInputStream.setCanceled(true);
+            });
 
-        asyncInputStream.exceptionHandler( exception -> {
-            logger.error(exception.toString());
-            ctx.fail(exception);
-        });
-
+        AsyncInputStream asyncInputStream = new AsyncInputStream(vertx, tarballInputStream);
         Pump pump = Pump.pump(asyncInputStream, ctx.response());
 
-        /* when all is done on the destination stream, report stats and close the response. */
         asyncInputStream
-            .exceptionHandler(cause -> {
-                logger.error(cause.toString());
+            .exceptionHandler( exception -> {
+                logger.error(exception.toString());
+                ctx.fail(exception);
             })
+
+            /* when all is done on the destination stream, report stats and close the response. */
             .endHandler(event -> {
                 pump.stop();
                 logger.debug("... archive file transfer completed, {} bytes transferred.",
                     ((PumpImpl) pump).getBytesPumped());
 
                 ResponseUtils.complete(ctx);
-            });
-
-        ctx
-            .response()
-            .closeHandler(event -> {
-                logger.warn("interrupted by client");
-                tarballInputStream.setCanceled(true);
             });
 
         logger.debug("archive file transfer started for {} ...", archiveName);
