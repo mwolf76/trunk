@@ -27,8 +27,9 @@ function setup_add_resource_modal() {
     $('#commit-added-collection-resource')
         .on('click', function (event) {
             var resourceName = $('#additional-collection-resource-input').val();
+            showLoader();
             putResource(resourceName, function() {
-                window.location.reload(true);
+                reloadWindow();
             });
         });
 
@@ -36,8 +37,9 @@ function setup_add_resource_modal() {
     $('#commit-added-document-resource')
         .on('click', function (event) {
             var file = $('#additional-resource-file-selector')[0].files[0];
+            showLoader();
             postResource(file, file.name, function () {
-                window.location.reload(true);
+                reloadWindow();
             });
         });
 } /* add_update_resource_modal() */
@@ -50,9 +52,10 @@ function setup_share_resource_modal() {
             var authorizedEmails = $('#share-collection-resource-input').val().split(';').map(function (s) {
                 return ( s || '' ).replace( /^\s+|\s+$/g, '' );
             });
-
+            
+            showLoader();
             putShare(collectionPath, authorizedEmails, function() {
-                window.location.reload(true);
+                reloadWindow();
             });
         });
 } /* share_update_resource_modal() */
@@ -106,8 +109,9 @@ function setup_update_resource_modal() {
         .on('click', function (event) {
             var file = $('#updated-resource-file-selector')[0].files[0];
             var filename = $('#roURL').val(); /* retrieve original URL from hidden */
+            showLoader();
             postResource(file, filename, function() {
-                window.location.reload(true);
+                reloadWindow();
             });
         });
 
@@ -115,13 +119,22 @@ function setup_update_resource_modal() {
     $('#update-resource-delete-button')
         .click(function () {
             var toDelete = $('#roURL').val();
+            showLoader();
             deleteResource(toDelete, function() {
-                window.location.reload(true);
+                reloadWindow();
             });
         });
 } /* setup_update_resource_modal() */
 
 /*** ajax helpers ***/
+function showLoader() {
+    $('#loader').removeClass('hidden');
+}
+
+function reloadWindow() {
+    window.location.reload(true);
+}
+
 function defaultErrorCallback(jqXHR, textStatus, errorThrown) {
     console.warn(jqXHR.responseText);
 }
