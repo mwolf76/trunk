@@ -9,7 +9,7 @@ import io.vertx.ext.web.RoutingContext;
 import org.blackcat.trunk.http.requests.handlers.PostResourceRequestHandler;
 import org.blackcat.trunk.resource.Resource;
 import org.blackcat.trunk.resource.impl.DocumentContentResource;
-import org.blackcat.trunk.streams.impl.PumpImpl;
+import org.blackcat.trunk.streams.pump.PumpImpl;
 
 import java.nio.file.Path;
 

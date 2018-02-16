@@ -1,4 +1,4 @@
-package org.blackcat.trunk.streams.impl;
+package org.blackcat.trunk.streams.pump;
 
 /*
  * Copyright 2014 Red Hat, Inc.

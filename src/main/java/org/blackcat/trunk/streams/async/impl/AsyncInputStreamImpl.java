@@ -1,10 +1,10 @@
-package org.blackcat.trunk.util;
+package org.blackcat.trunk.streams.async.impl;
 
 import io.vertx.core.*;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
-import io.vertx.core.streams.ReadStream;
+import org.blackcat.trunk.streams.async.AsyncInputStream;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,14 +12,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 
-/**
- * Wraps a regular InputStream into an AsyncInput Stream that can be used with
- * the Vert.X Pump mechanism
- *
- * @author stw
- *
- */
-public class AsyncInputStream implements ReadStream<Buffer> {
+final public class AsyncInputStreamImpl extends AsyncInputStream {
 
     private static final Logger logger = LoggerFactory.getLogger(AsyncInputStream.class);
 
@@ -43,18 +36,20 @@ public class AsyncInputStream implements ReadStream<Buffer> {
      *
      * @param in
      */
-    public AsyncInputStream(final Vertx vertx, final InputStream in) {
+    public AsyncInputStreamImpl(Vertx vertx, InputStream in) {
         this.vertx = vertx;
         this.context = vertx.getOrCreateContext();
         this.ch = Channels.newChannel(in);
     }
 
-    public void close() {
-        this.closeInternal(null);
-    }
-
+    @Override
     public void close(final Handler<AsyncResult<Void>> handler) {
         this.closeInternal(handler);
+    }
+
+    @Override
+    public void close() {
+        this.closeInternal(null);
     }
 
     /*
@@ -130,7 +125,7 @@ public class AsyncInputStream implements ReadStream<Buffer> {
     private void checkContext() {
         if (!this.vertx.getOrCreateContext().equals(this.context)) {
             throw new IllegalStateException("AsyncInputStream must only be used in the context that created it, expected: " + this.context
-                    + " actual " + this.vertx.getOrCreateContext());
+                                                + " actual " + this.vertx.getOrCreateContext());
         }
     }
 
@@ -158,14 +153,14 @@ public class AsyncInputStream implements ReadStream<Buffer> {
         // an executeBlocking and use the future there
         if (!this.readInProgress) {
             this.readInProgress = true;
-            final ByteBuffer buff = ByteBuffer.allocate(AsyncInputStream.TRANSFER_SIZE);
+            final ByteBuffer buff = ByteBuffer.allocate(AsyncInputStreamImpl.TRANSFER_SIZE);
 
             this.vertx.executeBlocking(future -> {
                 try {
                     final Integer bytesRead = this.ch.read(buff);
                     future.complete(bytesRead);
                 } catch (final Exception e) {
-                    AsyncInputStream.logger.error(e);
+                    AsyncInputStreamImpl.logger.error(e);
                     future.fail(e);
                 }
             } , res -> {
@@ -220,7 +215,7 @@ public class AsyncInputStream implements ReadStream<Buffer> {
         if ((this.exceptionHandler != null) && (t instanceof Exception)) {
             this.exceptionHandler.handle(t);
         } else {
-            AsyncInputStream.logger.error("Unhandled exception", t);
+            AsyncInputStreamImpl.logger.error("Unhandled exception", t);
 
         }
     }

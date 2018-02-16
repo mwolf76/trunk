@@ -1,7 +1,7 @@
-package org.blackcat.trunk.util;
+package org.blackcat.trunk.streams.tar.impl;
 
-import io.vertx.core.Vertx;
 import org.blackcat.trunk.storage.Storage;
+import org.blackcat.trunk.streams.tar.TarballInputStream;
 import org.kamranzafar.jtar.TarEntry;
 import org.kamranzafar.jtar.TarOutputStream;
 import org.slf4j.Logger;
@@ -15,29 +15,21 @@ import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class TarballInputStream extends InputStream {
+public final class TarballInputStreamImpl extends TarballInputStream {
+
+    private static final ExecutorService executorService = Executors.newCachedThreadPool();
+    private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
     private final Storage storage;
     private final PipedInputStream in;
     private final TarOutputStream out;
-    private long totalBytesWritten = 0;
 
+    private long totalBytesWritten = 0;
     private boolean canceled;
 
-    public synchronized boolean isCanceled() {
-        return canceled;
-    }
-
-    public synchronized void setCanceled(boolean canceled) {
-        this.canceled = canceled;
-    }
-
-    private static final Logger logger = LoggerFactory.getLogger(AsyncInputStream.class);
-    private static final ExecutorService executorService = Executors.newCachedThreadPool();
-
-    public TarballInputStream(Vertx vertx, Storage storage, Path collectionPath) throws IOException {
+    public TarballInputStreamImpl(Storage storage, Path collectionPath) {
         this.in = new PipedInputStream();
-        this.out = new TarOutputStream(new PipedOutputStream(in));
+        this.out = new TarOutputStream(wrapPipedOutputStream());
         this.storage = storage;
 
         executorService.submit(() -> {
@@ -64,13 +56,26 @@ public class TarballInputStream extends InputStream {
         });
     }
 
-    private void closeOutputStream() {
+    @Override
+    public int read() throws IOException {
+        return in.read();
+    }
+
+    @Override
+    public synchronized boolean isCanceled() {
+        return canceled;
+    }
+
+    @Override
+    public synchronized void setCanceled(boolean canceled) {
+        this.canceled = canceled;
+    }
+
+    private PipedOutputStream wrapPipedOutputStream() {
         try {
-            out.close();
-            logger.info("Written {} bytes of content data. Tarball stream is now closed", totalBytesWritten);
-        } catch (IOException ioe) {
-            logger.error(ioe.toString());
-            throw new RuntimeException(ioe);
+            return new PipedOutputStream(in);
+        } catch (IOException e) {
+            throw new TarballException(e);
         }
     }
 
@@ -105,6 +110,16 @@ public class TarballInputStream extends InputStream {
         return bytesWritten;
     }
 
+    private void closeOutputStream() {
+        try {
+            out.close();
+            logger.info("Written {} bytes of content data. Tarball stream is now closed", totalBytesWritten);
+        } catch (IOException ioe) {
+            logger.error(ioe.toString());
+            throw new RuntimeException(ioe);
+        }
+    }
+
     private String relativeFilename(Storage storage, Path entry) {
         return storage.getRoot().relativize(entry).toString();
     }
@@ -115,10 +130,5 @@ public class TarballInputStream extends InputStream {
 
     private boolean isRegularFile(Path path) {
         return storage.resourceProperties(path).isRegularFile();
-    }
-
-    @Override
-    public int read() throws IOException {
-        return in.read();
     }
 }

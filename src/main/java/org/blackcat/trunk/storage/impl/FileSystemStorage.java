@@ -338,15 +338,25 @@ public class FileSystemStorage implements Storage {
         });
     } /* putDocumentHelper() */
 
-    private void completeTransfer(FileSystem fileSystem, AsyncFile asyncFile, String destPathString, String tempPathString, Handler<Void> completionHandler) {
-        asyncFile.close(closeAsyncResult ->
-                            fileSystem.delete(destPathString,
-                                deleteAsyncResult ->
-                                    fileSystem.move(tempPathString, destPathString,
-                                        moveAsyncResult -> {
-                                            logger.info("File transfer operation completed.");
-                                            completionHandler.handle(null);
-                                        })));
+    private void completeTransfer(FileSystem fileSystem, AsyncFile asyncFile, String destPathString,
+                                  String tempPathString, Handler<Void> completionHandler) {
+        asyncFile.close(
+            closeAsyncResult -> {
+                fileSystem.delete(destPathString,
+                    deleteAsyncResult -> {
+                        fileSystem.move(tempPathString, destPathString,
+                            moveAsyncResult -> {
+                                fileSystem.props(destPathString, filePropsAsyncResult -> {
+                                    if (filePropsAsyncResult.succeeded()) {
+                                        FileProps result = filePropsAsyncResult.result();
+                                        logger.info("File transfer operation completed ({} bytes written).",
+                                            result.size());
+                                        completionHandler.handle(null);
+                                    }
+                                });
+                            });
+                    });
+            });
     }
 
     @Nullable
@@ -372,17 +382,22 @@ public class FileSystemStorage implements Storage {
                 if (! existsAsyncResult.result()) {
                     resourceHandler.handle(Future.failedFuture(new NotFoundException()));
                 } else {
-                    fileSystem.delete(pathString, deleteAsyncResult -> {
-                        if (deleteAsyncResult.failed())
-                            resourceHandler.handle(Future.failedFuture(
-                                new ConflictException(deleteAsyncResult.cause())));
-                        else
-                            resourceHandler.handle(Future.succeededFuture());
-                    });
+                    deleteResource(fileSystem, pathString, resourceHandler);
                 }
             }
         });
     } /* delete() */
+
+    private void deleteResource(FileSystem fileSystem, String pathString,
+                                Handler<AsyncResult<Void>> resourceHandler) {
+        fileSystem.delete(pathString, deleteAsyncResult -> {
+            if (deleteAsyncResult.failed())
+                resourceHandler.handle(Future.failedFuture(
+                    new ConflictException(deleteAsyncResult.cause())));
+            else
+                resourceHandler.handle(Future.succeededFuture());
+        });
+    }
 
     public static FileSystemStorage create(Vertx vertx, Path path) {
         return new FileSystemStorage(vertx, path);

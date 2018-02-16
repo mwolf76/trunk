@@ -19,12 +19,11 @@ import org.blackcat.trunk.resource.exceptions.NotFoundException;
 import org.blackcat.trunk.resource.impl.CollectionResource;
 import org.blackcat.trunk.resource.impl.DocumentContentResource;
 import org.blackcat.trunk.resource.impl.DocumentDescriptorResource;
-import org.blackcat.trunk.streams.impl.PumpImpl;
-import org.blackcat.trunk.util.AsyncInputStream;
-import org.blackcat.trunk.util.TarballInputStream;
+import org.blackcat.trunk.streams.pump.PumpImpl;
+import org.blackcat.trunk.streams.async.AsyncInputStream;
+import org.blackcat.trunk.streams.tar.TarballInputStream;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -242,28 +241,18 @@ final public class GetResourceRequestHandlerImpl extends BaseUserRequestHandler 
     }
 
     private void collectionTarballResponse(RoutingContext ctx, Path resolvedPath) {
-        try {
-            TarballInputStream tarballInputStream =
-                new TarballInputStream(vertx, storage, resolvedPath);
+        TarballInputStream tarballInputStream = TarballInputStream.create(storage, resolvedPath);
 
-            String archiveName = resolvedPath.getFileName().toString() + ".tar";
+        String archiveName = resolvedPath.getFileName().toString() + ".tar";
+        ctx.response()
+            .putHeader(Headers.CONTENT_TYPE_HEADER, tarMimeType)
+            .putHeader(Headers.CONTENT_DISPOSITION, String.format("attachment; filename=\"%s\"", archiveName))
+            .setChunked(true); // required
 
-            ctx.response()
-                .putHeader(Headers.CONTENT_TYPE_HEADER, tarMimeType)
-                .putHeader(Headers.CONTENT_DISPOSITION, String.format("attachment; filename=\"%s\"", archiveName))
-                .setChunked(true) // required
-            ;
-
-            setupTarballTransfer(ctx, tarballInputStream, archiveName);
-        }
-        catch (IOException ioe) {
-            logger.error(ioe);
-            ctx.fail(ioe);
-        }
+        setupTarballTransfer(ctx, tarballInputStream, archiveName);
     }
 
     private void setupTarballTransfer(RoutingContext ctx, TarballInputStream tarballInputStream, String archiveName) {
-
         /* interruption handler */
         ctx.response()
             .closeHandler(event -> {
@@ -271,7 +260,7 @@ final public class GetResourceRequestHandlerImpl extends BaseUserRequestHandler 
                 tarballInputStream.setCanceled(true);
             });
 
-        AsyncInputStream asyncInputStream = new AsyncInputStream(vertx, tarballInputStream);
+        AsyncInputStream asyncInputStream = AsyncInputStream.create(vertx, tarballInputStream);
         Pump pump = Pump.pump(asyncInputStream, ctx.response());
 
         asyncInputStream

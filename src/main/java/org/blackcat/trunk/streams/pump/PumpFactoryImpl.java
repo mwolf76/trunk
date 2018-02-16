@@ -1,4 +1,4 @@
-package org.blackcat.trunk.streams.impl;
+package org.blackcat.trunk.streams.pump;
 
 import java.util.Objects;
 
