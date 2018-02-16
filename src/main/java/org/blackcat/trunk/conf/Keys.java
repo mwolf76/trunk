@@ -4,6 +4,7 @@ final public class Keys {
     /* SERVER */
     public static final String SERVER_SECTION = "web";
 
+    public static final String SERVER_DOMAIN = "domain";
     public static final String SERVER_HTTP_HOST = "host";
     public static final String DEFAULT_SERVER_HTTP_HOST = "localhost";
 
@@ -50,14 +51,16 @@ final public class Keys {
     public static final String OAUTH2_CLIENT_ID = "clientID";
     public static final String OAUTH2_CLIENT_SECRET = "clientSecret";
 
-    public static final String OAUTH2_AUTH_SERVER_URL = "authServerURL";
-    public static final String DEFAULT_OAUTH2_AUTH_SERVER_URL = "http://localhost:9000";
+    /* reserved for keycloak oauth2 */
+    public static final String OAUTH2_KEYCLOAK_SECTION = "keycloak";
+    public static final String OAUTH2_KEYCLOAK_AUTH_SERVER_URL = "authServerURL";
+    public static final String DEFAULT_OAUTH2_KEYCLOAK_AUTH_SERVER_URL = "http://localhost:9000";
 
-    public static final String OAUTH2_AUTH_SERVER_REALM = "authServerRealm";
-    public static final String DEFAULT_OAUTH2_AUTH_SERVER_REALM = "master";
+    public static final String OAUTH2_KEYCLOAK_AUTH_SERVER_REALM = "authServerRealm";
+    public static final String DEFAULT_KEYCLOAK_OAUTH2_AUTH_SERVER_REALM = "master";
 
-    public static final String OAUTH2_AUTH_SERVER_PUBLIC_KEY = "authServerPublicKey";
-    public static final String DEFAULT_OAUTH2_AUTH_SERVER_PUBLIC_KEY = null;
+    public static final String OAUTH2_KEYCLOAK_AUTH_SERVER_PUBLIC_KEY = "authServerPublicKey";
+    public static final String DEFAULT_KEYCLOAK_OAUTH2_AUTH_SERVER_PUBLIC_KEY = null;
 
     private Keys()
     {}

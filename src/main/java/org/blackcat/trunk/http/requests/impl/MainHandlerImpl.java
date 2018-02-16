@@ -176,7 +176,7 @@ public final class MainHandlerImpl implements MainHandler {
                 MessageFormat.format("Unsupported OAuth2 provider: {0}", oauth2ProviderName));
         }
 
-        String callbackURL = callbackURL();
+        String callbackURL = configuration.getDomain() + OAUTH2_CALLBACK_LOCATION;
         logger.debug("Setting up oauth2 callback at {}", callbackURL);
         OAuth2AuthHandler authHandler = OAuth2AuthHandler.create(authProvider, callbackURL);
 
@@ -193,22 +193,16 @@ public final class MainHandlerImpl implements MainHandler {
         router.routeWithRegex("/share/.*").handler(authHandler);
     }
 
-    private String callbackURL() {
-        return String.format("http%s://%s:%d%s",
-            configuration.isSSLEnabled() ? "s" : "",
-            configuration.getHttpHost(),
-            configuration.getHttpPort(),
-            OAUTH2_CALLBACK_LOCATION);
-    }
-
     private JsonObject buildKeyCloakConfiguration() {
-        return new JsonObject().put("realm", configuration.getOauth2AuthServerRealm())
-                   .put("realm-public-key", configuration.getOauth2AuthServerPublicKey())
-                   .put("auth-server-url", configuration.getOauth2AuthServerURL())
-                   .put("ssl-required", "external")
-                   .put("resource", configuration.getOauth2ClientID())
-                   .put("credentials", new JsonObject()
-                                           .put("secret", configuration.getOauth2ClientSecret()));
+        JsonObject out = new JsonObject().put("realm", configuration.getOauth2AuthServerRealm())
+                             .put("realm-public-key", configuration.getOauth2AuthServerPublicKey())
+                             .put("auth-server-url", configuration.getOauth2AuthServerURL())
+                             .put("ssl-required", "external")
+                             .put("resource", configuration.getOauth2ClientID())
+                             .put("credentials", new JsonObject()
+                                                     .put("secret", configuration.getOauth2ClientSecret()));
+        logger.info(out);
+        return out;
     }
 
     @Override

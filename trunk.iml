@@ -12,6 +12,20 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" scope="TEST" name="Maven: io.rest-assured:rest-assured:3.0.7" level="project" />
+    <orderEntry type="library" scope="TEST" name="Maven: org.codehaus.groovy:groovy:2.4.12" level="project" />
+    <orderEntry type="library" scope="TEST" name="Maven: org.codehaus.groovy:groovy-xml:2.4.12" level="project" />
+    <orderEntry type="library" scope="TEST" name="Maven: org.apache.httpcomponents:httpmime:4.5.1" level="project" />
+    <orderEntry type="library" scope="TEST" name="Maven: org.hamcrest:hamcrest-library:1.3" level="project" />
+    <orderEntry type="library" scope="TEST" name="Maven: org.ccil.cowan.tagsoup:tagsoup:1.2.1" level="project" />
+    <orderEntry type="library" scope="TEST" name="Maven: io.rest-assured:json-path:3.0.7" level="project" />
+    <orderEntry type="library" scope="TEST" name="Maven: org.codehaus.groovy:groovy-json:2.4.12" level="project" />
+    <orderEntry type="library" scope="TEST" name="Maven: io.rest-assured:rest-assured-common:3.0.7" level="project" />
+    <orderEntry type="library" scope="TEST" name="Maven: io.rest-assured:xml-path:3.0.7" level="project" />
+    <orderEntry type="library" name="Maven: org.apache.commons:commons-lang3:3.4" level="project" />
+    <orderEntry type="library" scope="TEST" name="Maven: javax.xml.bind:jaxb-api:2.2.12" level="project" />
+    <orderEntry type="library" name="Maven: io.vertx:vertx-web-client:3.5.0" level="project" />
+    <orderEntry type="library" name="Maven: io.vertx:vertx-web-common:3.5.0" level="project" />
     <orderEntry type="library" scope="TEST" name="Maven: junit:junit:4.12" level="project" />
     <orderEntry type="library" scope="TEST" name="Maven: org.hamcrest:hamcrest-core:1.3" level="project" />
     <orderEntry type="library" scope="TEST" name="Maven: org.seleniumhq.selenium:selenium-java:3.8.1" level="project" />
@@ -35,6 +49,18 @@
     <orderEntry type="library" name="Maven: org.codehaus.mojo:animal-sniffer-annotations:1.14" level="project" />
     <orderEntry type="library" scope="TEST" name="Maven: org.apache.httpcomponents:httpclient:4.5.3" level="project" />
     <orderEntry type="library" scope="TEST" name="Maven: org.apache.httpcomponents:httpcore:4.4.6" level="project" />
+    <orderEntry type="library" scope="TEST" name="Maven: io.rest-assured:rest-assured:3.0.7" level="project" />
+    <orderEntry type="library" scope="TEST" name="Maven: org.codehaus.groovy:groovy:2.4.12" level="project" />
+    <orderEntry type="library" scope="TEST" name="Maven: org.codehaus.groovy:groovy-xml:2.4.12" level="project" />
+    <orderEntry type="library" scope="TEST" name="Maven: org.apache.httpcomponents:httpmime:4.5.1" level="project" />
+    <orderEntry type="library" scope="TEST" name="Maven: org.hamcrest:hamcrest-library:1.3" level="project" />
+    <orderEntry type="library" scope="TEST" name="Maven: org.ccil.cowan.tagsoup:tagsoup:1.2.1" level="project" />
+    <orderEntry type="library" scope="TEST" name="Maven: io.rest-assured:json-path:3.0.7" level="project" />
+    <orderEntry type="library" scope="TEST" name="Maven: org.codehaus.groovy:groovy-json:2.4.12" level="project" />
+    <orderEntry type="library" scope="TEST" name="Maven: io.rest-assured:rest-assured-common:3.0.7" level="project" />
+    <orderEntry type="library" scope="TEST" name="Maven: io.rest-assured:xml-path:3.0.7" level="project" />
+    <orderEntry type="library" name="Maven: org.apache.commons:commons-lang3:3.4" level="project" />
+    <orderEntry type="library" scope="TEST" name="Maven: javax.xml.bind:jaxb-api:2.2.12" level="project" />
     <orderEntry type="library" scope="TEST" name="Maven: org.seleniumhq.selenium:selenium-chrome-driver:3.8.1" level="project" />
     <orderEntry type="library" name="Maven: org.slf4j:slf4j-api:1.6.4" level="project" />
     <orderEntry type="library" name="Maven: ch.qos.logback:logback-classic:1.0.1" level="project" />
@@ -59,6 +85,8 @@
     <orderEntry type="library" name="Maven: io.vertx:vertx-config:3.5.0" level="project" />
     <orderEntry type="library" name="Maven: io.vertx:vertx-web:3.5.0" level="project" />
     <orderEntry type="library" name="Maven: io.vertx:vertx-bridge-common:3.5.0" level="project" />
+    <orderEntry type="library" name="Maven: io.vertx:vertx-web-client:3.5.0" level="project" />
+    <orderEntry type="library" name="Maven: io.vertx:vertx-web-common:3.5.0" level="project" />
     <orderEntry type="library" name="Maven: io.vertx:vertx-web-templ-pebble:3.5.0" level="project" />
     <orderEntry type="library" name="Maven: com.mitchellbosecke:pebble:2.3.0" level="project" />
     <orderEntry type="library" name="Maven: com.coverity.security:coverity-escapers:1.1" level="project" />
@@ -95,7 +123,6 @@
     <orderEntry type="library" name="Maven: de.flapdoodle.embed:de.flapdoodle.embed.mongo:1.48.2" level="project" />
     <orderEntry type="library" name="Maven: de.flapdoodle.embed:de.flapdoodle.embed.process:1.41.1" level="project" />
     <orderEntry type="library" name="Maven: commons-io:commons-io:2.4" level="project" />
-    <orderEntry type="library" name="Maven: org.apache.commons:commons-lang3:3.1" level="project" />
     <orderEntry type="library" name="Maven: net.java.dev.jna:jna:4.0.0" level="project" />
     <orderEntry type="library" name="Maven: net.java.dev.jna:jna-platform:4.0.0" level="project" />
     <orderEntry type="library" name="Maven: org.apache.commons:commons-compress:1.3" level="project" />

@@ -36,7 +36,8 @@ public class WebServerVerticle extends AbstractVerticle {
                 // in vertx 2x 100-continues was activated per default, in vertx 3x it is off per default.
                 .setHandle100ContinueAutomatically(true);
 
-        if (configuration.isSSLEnabled()) {
+        boolean sslEnabled = configuration.isSSLEnabled();
+        if (sslEnabled) {
             String keystoreFilename = configuration.getKeystoreFilename();
             String keystorePassword = configuration.getKeystorePassword();
 
@@ -53,7 +54,8 @@ public class WebServerVerticle extends AbstractVerticle {
             .requestHandler(MainHandler.create(vertx, configuration, storage))
             .listen(httpPort, result -> {
                 if (result.succeeded()) {
-                    logger.debug("Web server is now ready to accept requests on port {}.", httpPort);
+                    logger.debug("Web server is now ready to accept requests on port {} {}.",
+                        httpPort, sslEnabled ? "(ssl enabled)" : "");
                     startFuture.complete();
                 }
             });

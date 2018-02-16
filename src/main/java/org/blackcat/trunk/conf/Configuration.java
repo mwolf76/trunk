@@ -4,6 +4,7 @@ import io.vertx.core.json.JsonObject;
 import org.blackcat.trunk.conf.exceptions.ConfigurationException;
 
 import java.text.MessageFormat;
+import java.util.Objects;
 
 import static org.blackcat.trunk.conf.Keys.*;
 
@@ -13,12 +14,15 @@ import static org.blackcat.trunk.conf.Keys.*;
 final public class Configuration {
 
     /* http section */
+    private String domain;
+    private int startTimeout;
+
+    /* HTTP(S) server conf */
     private String httpHost;
     private int httpPort;
     private boolean useSSL;
     private String keystoreFilename;
     private String keystorePassword;
-    private int startTimeout;
 
     /* database section */
     private String dbType;
@@ -27,6 +31,7 @@ final public class Configuration {
     private String dbName;
 
     /* oauth2 section */
+
     private String oauth2Provider;
     private String oauth2ClientID;
     private String oauth2ClientSecret;
@@ -39,12 +44,12 @@ final public class Configuration {
     /* storage section */
     private String storageRoot;
 
-    public String getHttpHost() {
-        return httpHost;
+    public String getDomain() {
+        return domain;
     }
 
-    public void setBaseURL(String httpHost) {
-        this.httpHost = httpHost;
+    public String getHttpHost() {
+        return httpHost;
     }
 
     public int getHttpPort() {
@@ -68,8 +73,14 @@ final public class Configuration {
     }
 
     void parseServerSection(JsonObject jsonObject) {
-        final JsonObject serverSection = jsonObject.getJsonObject(SERVER_SECTION, new JsonObject());
+        JsonObject serverSection = jsonObject.getJsonObject(SERVER_SECTION, new JsonObject());
 
+        this.domain = serverSection.getString(SERVER_DOMAIN);
+        if (domain == null) {
+            throw new ConfigurationException("No domain specified.");
+        }
+
+        this.startTimeout = serverSection.getInteger(SERVER_START_TIMEOUT, DEFAULT_SERVER_START_TIMEOUT);
         this.httpHost = serverSection.getString(SERVER_HTTP_HOST, DEFAULT_SERVER_HTTP_HOST);
         this.httpPort = serverSection.getInteger(SERVER_HTTP_PORT, DEFAULT_SERVER_HTTP_PORT);
         this.useSSL = serverSection.getBoolean(SERVER_USE_SSL, DEFAULT_SERVER_USE_SSL);
@@ -77,7 +88,6 @@ final public class Configuration {
             this.keystoreFilename = serverSection.getString(SERVER_KEYSTORE_FILENAME, DEFAULT_SERVER_KEYSTORE_FILENAME);
             this.keystorePassword = serverSection.getString(SERVER_KEYSTORE_PASSWORD, DEFAULT_SERVER_KEYSTORE_PASSWORD);
         }
-        this.startTimeout = serverSection.getInteger(SERVER_START_TIMEOUT, DEFAULT_SERVER_START_TIMEOUT);
     }
 
     public String getOauth2Provider() {
@@ -165,13 +175,23 @@ final public class Configuration {
             throw new ConfigurationException("No oauth2 client secret specified");
         }
 
-        this.oauth2AuthServerURL = oauth2Section.getString(OAUTH2_AUTH_SERVER_URL, DEFAULT_OAUTH2_AUTH_SERVER_URL);
-        this.oauth2AuthServerRealm = oauth2Section.getString(OAUTH2_AUTH_SERVER_REALM, DEFAULT_OAUTH2_AUTH_SERVER_REALM);
-        this.oauth2AuthServerPublicKey = oauth2Section.getString(OAUTH2_AUTH_SERVER_PUBLIC_KEY, DEFAULT_OAUTH2_AUTH_SERVER_PUBLIC_KEY);
+        if (oauth2Provider.equals(OAUTH2_PROVIDER_KEYCLOAK)) {
+            parseOAuth2KeyCloakSection(oauth2Section);
+        }
+    }
+
+    private void parseOAuth2KeyCloakSection(JsonObject jsonObject) {
+        JsonObject oauth2KeycloakSection = jsonObject.getJsonObject(OAUTH2_KEYCLOAK_SECTION, new JsonObject());
+        this.oauth2AuthServerURL = oauth2KeycloakSection.getString(OAUTH2_KEYCLOAK_AUTH_SERVER_URL,
+            DEFAULT_OAUTH2_KEYCLOAK_AUTH_SERVER_URL);
+        this.oauth2AuthServerRealm = oauth2KeycloakSection.getString(OAUTH2_KEYCLOAK_AUTH_SERVER_REALM,
+            DEFAULT_KEYCLOAK_OAUTH2_AUTH_SERVER_REALM);
+        this.oauth2AuthServerPublicKey = oauth2KeycloakSection.getString(OAUTH2_KEYCLOAK_AUTH_SERVER_PUBLIC_KEY,
+            DEFAULT_KEYCLOAK_OAUTH2_AUTH_SERVER_PUBLIC_KEY);
     }
 
     void parseStorageSection(JsonObject jsonObject) {
-        final JsonObject storageSection = jsonObject.getJsonObject(STORAGE_SECTION, new JsonObject());
+        JsonObject storageSection = jsonObject.getJsonObject(STORAGE_SECTION, new JsonObject());
         this.storageRoot = storageSection.getString(STORAGE_ROOT, ".");
     }
 
@@ -187,14 +207,13 @@ final public class Configuration {
         StringBuilder sb = new StringBuilder();
 
         sb.append("Configuration{");
-        sb.append(String.format("startTimeout=%d", startTimeout));
-        sb.append(String.format(",httpHost=%s", httpHost));
+        sb.append(String.format("domain='%s'", domain));
+        sb.append(String.format(",startTimeout=%d", startTimeout));
+        sb.append(String.format(",httpHost='%s'", httpHost));
         sb.append(String.format(",httpPort=%s", httpPort));
         if (useSSL) {
             sb.append(String.format(",keystoreFilename='%s'", keystoreFilename));
-            sb.append(String.format(",keystorePassword='<hidden>'"));
-        } else {
-            sb.append(",ssl: disabled");
+            sb.append(String.format(",keystorePassword=<hidden>"));
         }
 
         sb.append(String.format(",storageRoot='%s'", storageRoot));
@@ -205,9 +224,12 @@ final public class Configuration {
 
         sb.append(String.format(",oauth2Provider='%s'", oauth2Provider));
         sb.append(String.format(",oauth2ClientID='%s'", oauth2ClientID));
-        sb.append(String.format(",oauth2ClientSecret='%s'", oauth2ClientSecret));
-        sb.append(String.format(",oauth2ClientRealm='%s'", oauth2AuthServerRealm));
-        sb.append(String.format(",oauth2ClientPublicKey='%s'", oauth2AuthServerPublicKey));
+
+        if (oauth2Provider.equals("keycloak")) {
+            sb.append(String.format(",oauth2ClientSecret='%s'", oauth2ClientSecret));
+            sb.append(String.format(",oauth2ServerRealm='%s'", oauth2AuthServerRealm));
+            sb.append(String.format(",oauth2ServerPublicKey='%s'", oauth2AuthServerPublicKey));
+        }
         sb.append("}");
 
         return sb.toString();
