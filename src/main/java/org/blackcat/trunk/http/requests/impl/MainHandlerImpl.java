@@ -22,6 +22,7 @@ import org.blackcat.trunk.http.requests.response.impl.HtmlResponseBuilderImpl;
 import org.blackcat.trunk.http.requests.response.impl.JsonResponseBuilderImpl;
 import org.blackcat.trunk.storage.Storage;
 
+import java.nio.file.Paths;
 import java.text.MessageFormat;
 
 import static org.blackcat.trunk.conf.Keys.OAUTH2_PROVIDER_GOOGLE;
@@ -52,8 +53,12 @@ public final class MainHandlerImpl implements MainHandler {
         this.htmlResponseBuilder = new HtmlResponseBuilderImpl(PebbleTemplateEngine.create(vertx));
         this.jsonResponseBuilder = new JsonResponseBuilderImpl();
 
+        // Initial routing ctx setup
+        router.route().handler(this::injectContextVars);
+
         setupMiddlewareHandlers();
         setupOAuth2Handlers();
+
         setupProtectedHandlers();
         setupPublicHandlers();
         setupErrorHandlers();
@@ -66,9 +71,6 @@ public final class MainHandlerImpl implements MainHandler {
             ctx.request().pause();
             ctx.next();
         });
-
-        // Initial routing ctx setup
-        router.route().handler(this::injectContextVars);
 
         // We need cookies, sessions and request bodies
         router.route().handler(CookieHandler.create());
@@ -114,25 +116,19 @@ public final class MainHandlerImpl implements MainHandler {
     private void setupProtectedHandlers() {
         /* An extra handler to fetch user info into context */
         UserInfoHandler userInfoHandler = UserInfoHandler.create();
-        router.routeWithRegex("/protected/.*").handler(userInfoHandler);
+
+        /* protected */
+        router.routeWithRegex("/protected/.*")
+            .handler(userInfoHandler);
 
         router.get("/protected/main")
             .handler(ProtectedIndexHandler.create());
 
+        router.get("/protected/root")
+            .handler(GetProtectedUserRootHandler.create());
+
         router.get("/protected/logout")
             .handler(LogoutRequestHandler.create());
-
-        router.getWithRegex("/share/.*")
-            .handler(GetSharingInformationRequestHandler.create());
-
-        router.putWithRegex("/share/.*")
-            .handler(BodyHandler.create());
-
-        router.routeWithRegex("/share/.*")
-            .handler(userInfoHandler);
-
-        router.putWithRegex("/share/.*")
-            .handler(PutSharingInformationRequestHandler.create());
 
         router.getWithRegex("/protected/.*")
             .handler(GetResourceRequestHandler.create());
@@ -145,6 +141,20 @@ public final class MainHandlerImpl implements MainHandler {
 
         router.deleteWithRegex("/protected/.*")
             .handler(DeleteResourceRequestHandler.create());
+
+        /* share */
+        router.routeWithRegex("/share/.*")
+            .handler(userInfoHandler);
+
+        router.putWithRegex("/share/.*")
+            .handler(BodyHandler.create());
+
+        router.putWithRegex("/share/.*")
+            .handler(PutSharingInformationRequestHandler.create());
+
+        router.getWithRegex("/share/.*")
+            .handler(GetSharingInformationRequestHandler.create());
+
     }
 
     private void setupPublicHandlers() {
@@ -170,7 +180,7 @@ public final class MainHandlerImpl implements MainHandler {
             logger.info("Configuring Keycloak oauth2 provider");
             authProvider = KeycloakAuth.create(vertx,
                 OAuth2FlowType.AUTH_CODE,
-                buildKeyCloakConfiguration());
+                configuration.buildKeyCloakConfiguration());
         } else {
             throw new RuntimeException(
                 MessageFormat.format("Unsupported OAuth2 provider: {0}", oauth2ProviderName));
@@ -191,18 +201,6 @@ public final class MainHandlerImpl implements MainHandler {
         authHandler.setupCallback(router.get(OAUTH2_CALLBACK_LOCATION));
         router.routeWithRegex("/protected/.*").handler(authHandler);
         router.routeWithRegex("/share/.*").handler(authHandler);
-    }
-
-    private JsonObject buildKeyCloakConfiguration() {
-        JsonObject out = new JsonObject().put("realm", configuration.getOauth2AuthServerRealm())
-                             .put("realm-public-key", configuration.getOauth2AuthServerPublicKey())
-                             .put("auth-server-url", configuration.getOauth2AuthServerURL())
-                             .put("ssl-required", "external")
-                             .put("resource", configuration.getOauth2ClientID())
-                             .put("credentials", new JsonObject()
-                                                     .put("secret", configuration.getOauth2ClientSecret()));
-        logger.info(out);
-        return out;
     }
 
     @Override

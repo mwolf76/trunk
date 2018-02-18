@@ -238,4 +238,17 @@ final public class Configuration {
     public static Configuration create(JsonObject config) {
         return new Configuration(config);
     }
+
+    /* keycloak helper method */
+    public JsonObject buildKeyCloakConfiguration() {
+        return new JsonObject()
+                   .put("realm", getOauth2AuthServerRealm())
+                   .put("realm-public-key", getOauth2AuthServerPublicKey())
+                   .put("auth-server-url", getOauth2AuthServerURL())
+                   .put("ssl-required", "external")
+                   .put("resource", getOauth2ClientID())
+                   .put("credentials",
+                       new JsonObject()
+                           .put("secret", getOauth2ClientSecret()));
+    }
 }
