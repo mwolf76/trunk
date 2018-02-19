@@ -1,6 +1,7 @@
 package org.blackcat.trunk.http.requests.handlers.impl;
 
 import io.vertx.core.Future;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
@@ -117,7 +118,9 @@ final public class PutSharingInformationRequestHandlerImpl extends BaseUserReque
     }
 
     private List<String> newAuthorizedUsers(RoutingContext ctx) {
-        return ctx.getBodyAsJson().getJsonArray("authorizedUsers").stream()
+        JsonObject bodyAsJson = ctx.getBodyAsJson();
+        JsonArray authorizedUsers = bodyAsJson.getJsonArray("authorizedUsers");
+        return authorizedUsers.stream()
             .filter(o -> o instanceof String)
             .map(String::valueOf)
             .filter(s -> "*".equals(s) || isValidEmail(s))

@@ -73,16 +73,20 @@ abstract public class BaseUserRequestHandler implements Handler<RoutingContext> 
     }
 
     public void checkHtmlRequest(RoutingContext ctx, Handler<Void> handler) {
-        if (! ctx.get(requestTypeKey).equals(RequestType.HTML))
+        if (! ctx.get(requestTypeKey).equals(RequestType.HTML)) {
+            logger.warn("Expected HTML request, got JSON. Rejecting...");
             htmlResponseBuilder.badRequest(ctx);
+        }
 
-        else handler.handle(null);
+        else handler.handle(null); /* ok */
     }
 
     public void checkJsonRequest(RoutingContext ctx, Handler<Void> handler) {
-        if (! ctx.get(requestTypeKey).equals(RequestType.JSON))
+        if (! ctx.get(requestTypeKey).equals(RequestType.JSON)) {
+            logger.warn("Expected JSON request, got HTML. Rejecting...");
             jsonResponseBuilder.badRequest(ctx);
+        }
 
-        else handler.handle(null);
+        else handler.handle(null); /* ok */
     }
 }
