@@ -2,7 +2,6 @@ package org.blackcat.trunk.http.requests.impl;
 
 import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpServerRequest;
-import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.ext.auth.oauth2.OAuth2Auth;
@@ -22,7 +21,6 @@ import org.blackcat.trunk.http.requests.response.impl.HtmlResponseBuilderImpl;
 import org.blackcat.trunk.http.requests.response.impl.JsonResponseBuilderImpl;
 import org.blackcat.trunk.storage.Storage;
 
-import java.nio.file.Paths;
 import java.text.MessageFormat;
 
 import static org.blackcat.trunk.conf.Keys.OAUTH2_PROVIDER_GOOGLE;
@@ -71,6 +69,9 @@ public final class MainHandlerImpl implements MainHandler {
             ctx.request().pause();
             ctx.next();
         });
+
+        /* required */
+        router.putWithRegex("/share/.*").handler(BodyHandler.create());
 
         // We need cookies, sessions and request bodies
         router.route().handler(CookieHandler.create());
@@ -145,9 +146,6 @@ public final class MainHandlerImpl implements MainHandler {
         /* share */
         router.routeWithRegex("/share/.*")
             .handler(userInfoHandler);
-
-        router.putWithRegex("/share/.*")
-            .handler(BodyHandler.create());
 
         router.putWithRegex("/share/.*")
             .handler(PutSharingInformationRequestHandler.create());
