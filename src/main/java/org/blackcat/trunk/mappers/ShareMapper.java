@@ -62,6 +62,29 @@ final public class ShareMapper {
     }
 
     @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof ShareMapper)) return false;
+
+        ShareMapper that = (ShareMapper) o;
+
+        if (id != null ? !id.equals(that.id) : that.id != null) return false;
+        if (collectionPath != null ? !collectionPath.equals(that.collectionPath) : that.collectionPath != null)
+            return false;
+        if (owner != null ? !owner.equals(that.owner) : that.owner != null) return false;
+        return authorizedUsers != null ? authorizedUsers.equals(that.authorizedUsers) : that.authorizedUsers == null;
+    }
+
+    @Override
+    public int hashCode() {
+        int result = id != null ? id.hashCode() : 0;
+        result = 31 * result + (collectionPath != null ? collectionPath.hashCode() : 0);
+        result = 31 * result + (owner != null ? owner.hashCode() : 0);
+        result = 31 * result + (authorizedUsers != null ? authorizedUsers.hashCode() : 0);
+        return result;
+    }
+
+    @Override
     public String toString() {
         return "ShareMapper{" +
                 "id='" + id + '\'' +

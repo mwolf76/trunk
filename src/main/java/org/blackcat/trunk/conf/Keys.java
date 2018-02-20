@@ -26,6 +26,7 @@ final public class Keys {
     /* STORAGE */
     public static final String STORAGE_SECTION = "storage";
     public static final String STORAGE_ROOT = "root";
+    public static final String DEFAULT_STORAGE_ROOT = "/var/lib/trunk";
 
     /* DATABASE */
     public static final String DATABASE_SECTION = "database";
@@ -53,13 +54,13 @@ final public class Keys {
 
     /* reserved for keycloak oauth2 */
     public static final String OAUTH2_KEYCLOAK_SECTION = "keycloak";
-    public static final String OAUTH2_KEYCLOAK_AUTH_SERVER_URL = "authServerURL";
+    public static final String OAUTH2_KEYCLOAK_AUTH_SERVER_URL = "URL";
     public static final String DEFAULT_OAUTH2_KEYCLOAK_AUTH_SERVER_URL = "http://localhost:9000";
 
-    public static final String OAUTH2_KEYCLOAK_AUTH_SERVER_REALM = "authServerRealm";
+    public static final String OAUTH2_KEYCLOAK_AUTH_SERVER_REALM = "realm";
     public static final String DEFAULT_KEYCLOAK_OAUTH2_AUTH_SERVER_REALM = "master";
 
-    public static final String OAUTH2_KEYCLOAK_AUTH_SERVER_PUBLIC_KEY = "authServerPublicKey";
+    public static final String OAUTH2_KEYCLOAK_AUTH_SERVER_PUBLIC_KEY = "realmPublicKey";
     public static final String DEFAULT_KEYCLOAK_OAUTH2_AUTH_SERVER_PUBLIC_KEY = null;
 
     private Keys()

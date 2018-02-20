@@ -2,9 +2,11 @@ package org.blackcat.trunk.conf;
 
 import io.vertx.core.json.JsonObject;
 import org.blackcat.trunk.conf.exceptions.ConfigurationException;
+import org.blackcat.trunk.util.Utils;
 
 import java.text.MessageFormat;
-import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.blackcat.trunk.conf.Keys.*;
 
@@ -75,11 +77,6 @@ final public class Configuration {
     void parseServerSection(JsonObject jsonObject) {
         JsonObject serverSection = jsonObject.getJsonObject(SERVER_SECTION, new JsonObject());
 
-        this.domain = serverSection.getString(SERVER_DOMAIN);
-        if (domain == null) {
-            throw new ConfigurationException("No domain specified.");
-        }
-
         this.startTimeout = serverSection.getInteger(SERVER_START_TIMEOUT, DEFAULT_SERVER_START_TIMEOUT);
         this.httpHost = serverSection.getString(SERVER_HTTP_HOST, DEFAULT_SERVER_HTTP_HOST);
         this.httpPort = serverSection.getInteger(SERVER_HTTP_PORT, DEFAULT_SERVER_HTTP_PORT);
@@ -87,6 +84,11 @@ final public class Configuration {
         if (useSSL) {
             this.keystoreFilename = serverSection.getString(SERVER_KEYSTORE_FILENAME, DEFAULT_SERVER_KEYSTORE_FILENAME);
             this.keystorePassword = serverSection.getString(SERVER_KEYSTORE_PASSWORD, DEFAULT_SERVER_KEYSTORE_PASSWORD);
+        }
+
+        this.domain = serverSection.getString(SERVER_DOMAIN);
+        if (domain == null) {
+            domain = String.format("%s://%s:%d", useSSL ? "https" : "http", httpHost, httpPort);
         }
     }
 
@@ -175,24 +177,84 @@ final public class Configuration {
             throw new ConfigurationException("No oauth2 client secret specified");
         }
 
-        if (oauth2Provider.equals(OAUTH2_PROVIDER_KEYCLOAK)) {
-            parseOAuth2KeyCloakSection(oauth2Section);
+        if (oauth2Provider.equals(OAUTH2_PROVIDER_GOOGLE)) {
+            validateGoogleOauth2Settings(oauth2Section);
+        } else if (oauth2Provider.equals(OAUTH2_PROVIDER_KEYCLOAK)) {
+            validateKeyCloakOauth2Settings(oauth2Section);
         }
     }
 
-    private void parseOAuth2KeyCloakSection(JsonObject jsonObject) {
+    private void validateGoogleOauth2Settings(JsonObject oauth2Section) {
+        validateGoogleOAuth2ClientID(oauth2Section);
+        validateGoogleOAuth2ClientSecret(oauth2Section);
+    }
+
+    final static String googleClientSuffix = ".apps.googleusercontent.com";
+    private void validateGoogleOAuth2ClientID(JsonObject oauth2Section) {
+        String clientID = oauth2Section.getString(OAUTH2_CLIENT_ID);
+        if (! clientID.endsWith(googleClientSuffix))
+            throw new ConfigurationException(MessageFormat.format("{0} is not a valid Google client ID", clientID));
+    }
+
+    final static String uuidRegExp = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
+    private void validateGoogleOAuth2ClientSecret(JsonObject oauth2Section) {
+        String secret = oauth2Section.getString(OAUTH2_CLIENT_SECRET);
+        Pattern uuidPattern = Pattern.compile(uuidRegExp);
+        Matcher matcher = uuidPattern.matcher(secret);
+        if (! matcher.matches())
+            throw new ConfigurationException( MessageFormat.format("{0} is not a valid UUID", secret));
+    }
+
+    private void validateKeyCloakOauth2Settings(JsonObject jsonObject) {
+        validateKeycloakOAuth2ClientID(jsonObject);
+        validateKeycloakOAuth2ClientSecret(jsonObject);
+
         JsonObject oauth2KeycloakSection = jsonObject.getJsonObject(OAUTH2_KEYCLOAK_SECTION, new JsonObject());
+
         this.oauth2AuthServerURL = oauth2KeycloakSection.getString(OAUTH2_KEYCLOAK_AUTH_SERVER_URL,
             DEFAULT_OAUTH2_KEYCLOAK_AUTH_SERVER_URL);
+        validateKeycloakAuthServerURL(oauth2AuthServerURL);
+
         this.oauth2AuthServerRealm = oauth2KeycloakSection.getString(OAUTH2_KEYCLOAK_AUTH_SERVER_REALM,
             DEFAULT_KEYCLOAK_OAUTH2_AUTH_SERVER_REALM);
+        validateKeycloakAuthRealm(oauth2AuthServerRealm);
+
         this.oauth2AuthServerPublicKey = oauth2KeycloakSection.getString(OAUTH2_KEYCLOAK_AUTH_SERVER_PUBLIC_KEY,
             DEFAULT_KEYCLOAK_OAUTH2_AUTH_SERVER_PUBLIC_KEY);
+        /* mmmhhh... validating public would entail cracking RSA! we can not perform validation here */
+    }
+
+    private void validateKeycloakOAuth2ClientID(JsonObject jsonObject) {
+        String id = jsonObject.getString(OAUTH2_CLIENT_ID);
+        if (id.isEmpty())
+            throw new ConfigurationException("Client ID must be a non-empty alphanumerical string");
+    }
+
+    final static String secretRegExp = "^[0-9a-zA-Z]{24}$";
+    private void validateKeycloakOAuth2ClientSecret(JsonObject jsonObject) {
+        String secret = jsonObject.getString(OAUTH2_CLIENT_SECRET);
+        if (secret.isEmpty())
+            throw new ConfigurationException("Client secret must be a non-empty alphanumerical string");
+
+        Pattern secretPattern = Pattern.compile(secretRegExp);
+        Matcher matcher = secretPattern.matcher(secret);
+        if (! matcher.matches())
+            throw new ConfigurationException( MessageFormat.format("{0} is not a valid client secret", secret));
+    }
+
+    private void validateKeycloakAuthRealm(String oauth2AuthServerRealm) {
+        if (oauth2AuthServerRealm.isEmpty())
+            throw new ConfigurationException("Realm must me a non empty string");
+    }
+
+    private void validateKeycloakAuthServerURL(String oauth2AuthServerURL) {
+        if (!Utils.isValidURL(oauth2AuthServerURL))
+            throw new ConfigurationException(MessageFormat.format("{0} is not a valid URL", oauth2AuthServerURL));
     }
 
     void parseStorageSection(JsonObject jsonObject) {
         JsonObject storageSection = jsonObject.getJsonObject(STORAGE_SECTION, new JsonObject());
-        this.storageRoot = storageSection.getString(STORAGE_ROOT, ".");
+        this.storageRoot = storageSection.getString(STORAGE_ROOT, DEFAULT_STORAGE_ROOT);
     }
 
     public Configuration(JsonObject jsonObject) {
@@ -224,11 +286,12 @@ final public class Configuration {
 
         sb.append(String.format(",oauth2Provider='%s'", oauth2Provider));
         sb.append(String.format(",oauth2ClientID='%s'", oauth2ClientID));
+        sb.append(String.format(",oauth2ClientSecret='%s'", oauth2ClientSecret));
 
         if (oauth2Provider.equals("keycloak")) {
-            sb.append(String.format(",oauth2ClientSecret='%s'", oauth2ClientSecret));
-            sb.append(String.format(",oauth2ServerRealm='%s'", oauth2AuthServerRealm));
-            sb.append(String.format(",oauth2ServerPublicKey='%s'", oauth2AuthServerPublicKey));
+            sb.append(String.format(",keyCloakServerURL='%s'", oauth2AuthServerRealm));
+            sb.append(String.format(",realm='%s'", oauth2AuthServerRealm));
+            sb.append(String.format(",realPublicKey='%s'", oauth2AuthServerPublicKey));
         }
         sb.append("}");
 

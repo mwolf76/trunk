@@ -11,6 +11,8 @@ import io.vertx.ext.web.RoutingContext;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.UnsupportedEncodingException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.file.Path;
@@ -67,10 +69,19 @@ final public class Utils {
         return nameStub + "." + UUID.randomUUID().toString();
     }
 
-    @NotNull
     public static boolean isValidEmail(String email) {
         Objects.requireNonNull(email);
         return emailPattern.matcher(email).matches();
+    }
+
+    public static boolean isValidURL(String url) {
+        Objects.requireNonNull(url);
+        try {
+            new URI(url).parseServerAuthority();
+            return true;
+        } catch (URISyntaxException e) {
+            return false;
+        }
     }
 
     public static String buildBackLink(int index) {
