@@ -39,6 +39,7 @@ final public class DataStoreVerticle extends AbstractVerticle {
             configuration.getDatabaseHost(),
             configuration.getDatabasePort());
 
+        logger.info("DB connection string: {}", connectionString);
         JsonObject mongoConfig = new JsonObject()
                                      .put("connection_string", connectionString)
                                      .put("db_name", configuration.getDatabaseName());

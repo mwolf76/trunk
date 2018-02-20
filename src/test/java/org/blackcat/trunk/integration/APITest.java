@@ -3,7 +3,6 @@ package org.blackcat.trunk.integration;
 import io.vertx.core.*;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.file.FileSystem;
-import io.vertx.core.http.HttpClientRequest;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
@@ -21,14 +20,13 @@ import io.vertx.ext.web.client.HttpResponse;
 import io.vertx.ext.web.client.WebClient;
 import io.vertx.ext.web.client.WebClientOptions;
 import org.blackcat.trunk.conf.Configuration;
+import org.blackcat.trunk.conf.Keys;
 import org.blackcat.trunk.verticles.MainVerticle;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import java.util.Objects;
 import java.util.UUID;
 
 @RunWith(VertxUnitRunner.class)
@@ -39,7 +37,7 @@ public class APITest {
     @Rule
     public final RunTestOnContext rule = new RunTestOnContext();
 
-    @Test
+    @Test(timeout = 10000)
     public void getUserProtectedRootWithNoAccessToken(TestContext context) {
         Async async = context.async();
         Vertx vertx = rule.vertx();
@@ -67,7 +65,7 @@ public class APITest {
         });
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void putUserProtectedRootSharingWithValidCredentials(TestContext context) {
         Async async = context.async();
         Vertx vertx = rule.vertx();
@@ -84,6 +82,7 @@ public class APITest {
             OAuth2FlowType.PASSWORD, configuration.buildKeyCloakConfiguration());
 
         deployForTesting(context, vertx, done -> {
+            logger.debug("Authenticating...");
             oauth2.authenticate(userCredentials, (AsyncResult<User> userAsyncResult) -> {
                 if (userAsyncResult.failed()) {
                     context.fail(userAsyncResult.cause());
@@ -134,7 +133,7 @@ public class APITest {
         });
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void getUserProtectedRootWithValidCredentials(TestContext context) {
         Async async = context.async();
         Vertx vertx = rule.vertx();
@@ -167,21 +166,25 @@ public class APITest {
         });
     }
 
-    @Test
+    @Test(timeout = 10000)
     public void getUserProtectedRootWithWrongCredentials(TestContext context) {
+        Async async = context.async();
         Vertx vertx = rule.vertx();
         JsonObject userCredentials = new JsonObject()
                                          .put("username", "admin")
                                          .put("password", "password");
 
         deployForTesting(context, vertx, done -> {
-            getUserProtectedRootWithCredentials(vertx, userCredentials, context.asyncAssertFailure());
+            getUserProtectedRootWithCredentials(vertx, userCredentials, responseAsyncResult -> {
+                context.assertTrue(responseAsyncResult.failed());
+                async.complete();
+            });
         });
     }
 
     private void getUserProtectedRootWithCredentials(Vertx vertx,
-                                                     JsonObject userCredentials,
-                                                     Handler<AsyncResult<HttpResponse<Buffer>>> handler) {
+                                                    JsonObject userCredentials,
+                                                    Handler<AsyncResult<HttpResponse<Buffer>>> handler) {
 
         JsonObject jsonConfig = getJsonConfiguration();
         Configuration configuration = new Configuration(jsonConfig);
@@ -200,17 +203,6 @@ public class APITest {
                 makeJsonRequest(client.get("/protected/root"), access_token).send(handler);
             }
         });
-    }
-
-    private static JsonObject getJsonConfiguration() {
-        final String jsonConfFile = "conf/config.json";
-        try {
-            byte[] bytes = Files.readAllBytes(Paths.get(jsonConfFile));
-            return new JsonObject(new String(bytes));
-        } catch (IOException e) {
-            e.printStackTrace();
-            throw new RuntimeException("Failed to load " + jsonConfFile);
-        }
     }
 
     private HttpRequest<Buffer> makeJsonRequest(HttpRequest<Buffer> request, String access_token) {
@@ -237,6 +229,30 @@ public class APITest {
         return WebClient.create(vertx, webClientOptions);
     }
 
+    private static JsonObject getJsonConfiguration() {
+        String clientID = System.getProperty("clientID");
+        Objects.requireNonNull(clientID);
+
+        String clientSecret = System.getProperty("clientSecret");
+        Objects.requireNonNull(clientSecret);
+
+        String realmPublicKey = System.getProperty("realmPublicKey");
+        Objects.requireNonNull(realmPublicKey);
+
+        return
+            new JsonObject()
+                .put(Keys.OAUTH2_SECTION, new JsonObject()
+                                              .put(Keys.OAUTH2_PROVIDER, Keys.OAUTH2_PROVIDER_KEYCLOAK)
+                                              .put(Keys.OAUTH2_CLIENT_ID, clientID)
+                                              .put(Keys.OAUTH2_CLIENT_SECRET, clientSecret)
+                                              .put(Keys.OAUTH2_PROVIDER, Keys.OAUTH2_PROVIDER_KEYCLOAK)
+                                              .put(Keys.OAUTH2_KEYCLOAK_SECTION, new JsonObject()
+                                                                                     .put(Keys.OAUTH2_KEYCLOAK_AUTH_SERVER_PUBLIC_KEY,
+                                                                                         realmPublicKey)))
+                .put(Keys.STORAGE_SECTION, new JsonObject()
+                                               .put(Keys.STORAGE_ROOT, "/tmp/trunk"));
+    }
+
     private void deployForTesting(TestContext context, Vertx vertx, Handler<AsyncResult<Void>> completionHandler) {
         JsonObject jsonConfig = getJsonConfiguration();
         Configuration configuration = new Configuration(jsonConfig);
@@ -244,12 +260,15 @@ public class APITest {
         String rootPath = configuration.getStorageRoot();
 
         FileSystem fileSystem = vertx.fileSystem();
+        logger.warn("Erasing root path {}", rootPath);
         fileSystem.deleteRecursive(rootPath, true, _1 -> {
+            logger.warn("Recreating root path {}", rootPath);
             fileSystem.mkdir(rootPath, _2 -> {
                 DeploymentOptions deploymentOptions =
                     new DeploymentOptions()
                         .setConfig(jsonConfig);
 
+                logger.info("Deploying...", rootPath);
                 vertx.deployVerticle(MainVerticle.class.getName(),
                     deploymentOptions, deploymentAsyncResult -> {
                         context.assertTrue(deploymentAsyncResult.succeeded());
