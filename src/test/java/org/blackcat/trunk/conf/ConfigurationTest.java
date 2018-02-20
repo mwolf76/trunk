@@ -178,7 +178,7 @@ public class ConfigurationTest {
         String myFancyClientID =
             "myFancyClient";
         String myFancySecret =
-            "Fi2TyjQJAYeuaJfxV2XIWLXP";
+            "01234567-9ABC-DEF0-1234-56789ABCDEF0";
 
         return new JsonObject()
                    .put(Keys.OAUTH2_SECTION, new JsonObject()
@@ -191,7 +191,7 @@ public class ConfigurationTest {
         String myFancyClientID =
             "01234567-9ABC-DEF0-1234-56789ABCDEF0.apps.googleusercontent.com";
         String myFancySecret =
-            "01234567-9ABC-DEF0-1234-56789ABCDEF0";
+            "Fi2TyjQJAYeuaJfxV2XIWLXP";
 
         return new JsonObject()
                    .put(Keys.OAUTH2_SECTION, new JsonObject()

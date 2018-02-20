@@ -196,10 +196,10 @@ final public class Configuration {
             throw new ConfigurationException(MessageFormat.format("{0} is not a valid Google client ID", clientID));
     }
 
-    final static String uuidRegExp = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
+    final static String googleSecretRegExp = "^[0-9a-zA-Z]{24}$";
     private void validateGoogleOAuth2ClientSecret(JsonObject oauth2Section) {
         String secret = oauth2Section.getString(OAUTH2_CLIENT_SECRET);
-        Pattern uuidPattern = Pattern.compile(uuidRegExp);
+        Pattern uuidPattern = Pattern.compile(googleSecretRegExp);
         Matcher matcher = uuidPattern.matcher(secret);
         if (! matcher.matches())
             throw new ConfigurationException( MessageFormat.format("{0} is not a valid UUID", secret));
@@ -230,13 +230,13 @@ final public class Configuration {
             throw new ConfigurationException("Client ID must be a non-empty alphanumerical string");
     }
 
-    final static String secretRegExp = "^[0-9a-zA-Z]{24}$";
+    final static String keyCloakSecretRegExp = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
     private void validateKeycloakOAuth2ClientSecret(JsonObject jsonObject) {
         String secret = jsonObject.getString(OAUTH2_CLIENT_SECRET);
         if (secret.isEmpty())
             throw new ConfigurationException("Client secret must be a non-empty alphanumerical string");
 
-        Pattern secretPattern = Pattern.compile(secretRegExp);
+        Pattern secretPattern = Pattern.compile(keyCloakSecretRegExp);
         Matcher matcher = secretPattern.matcher(secret);
         if (! matcher.matches())
             throw new ConfigurationException( MessageFormat.format("{0} is not a valid client secret", secret));
