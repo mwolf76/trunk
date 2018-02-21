@@ -26,7 +26,7 @@ the keycloak server is exposed on port 9000.
 
 I suggest you run this in a separate terminal or even better in a tmux
 instance and leave it running in the background. Refer to this video
-for a step-by-step tutorial showing how to setuo OAuth2 in Vert.X
+for a step-by-step tutorial showing how to setup OAuth2 in Vert.X
 using keycloak:
 
 https://www.youtube.com/watch?v=c20igjL69Mo&index=1&list=PLK5alv8kedh0ul9NeuDgYYpX0I6yzjWw_
